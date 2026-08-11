@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ est.nombres }} {{ est.apellidos }} · Carné Digital</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <div class="carnet">
+    <div class="carnet__header">
+      <div class="carnet__sello">{{ institucion[0] }}</div>
+      <div class="carnet__institucion">{{ institucion }}</div>
+      <div class="carnet__subtitulo">Carné Digital de Estudiante</div>
+    </div>
+
+    <div class="carnet__ribbon">
+      ESTUDIANTE&nbsp;VERIFICADO&nbsp;•&nbsp;ESTUDIANTE&nbsp;VERIFICADO&nbsp;•&nbsp;ESTUDIANTE&nbsp;VERIFICADO&nbsp;•&nbsp;ESTUDIANTE&nbsp;VERIFICADO&nbsp;•
+    </div>
+
+    <div class="carnet__foto-zona">
+      <svg class="carnet__rosette" viewBox="0 0 168 168" xmlns="http://www.w3.org/2000/svg">
+        <g fill="none" stroke="#C9A227">
+          <circle cx="84" cy="84" r="82" stroke-width="0.6" opacity="0.35"/>
+          <circle cx="84" cy="84" r="72" stroke-width="0.6" opacity="0.3"/>
+          <circle cx="84" cy="84" r="62" stroke-width="0.6" opacity="0.4"/>
+          <circle cx="84" cy="84" r="52" stroke-width="0.6" opacity="0.5"/>
+          {% for i in range(24) %}
+          <line x1="84" y1="84" x2="166" y2="84"
+                transform="rotate({{ i * 15 }} 84 84)"
+                stroke-width="0.5" opacity="0.25"/>
+          {% endfor %}
+        </g>
+      </svg>
+      <div class="carnet__foto">
+        {% if est.foto_url %}
+          <img src="{{ est.foto_url }}" alt="Foto de {{ est.nombres }}">
+        {% else %}
+          {{ est.nombres[0] }}{{ est.apellidos[0] }}
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="carnet__nombre-zona">
+      <div class="carnet__nombre">{{ est.nombres }} {{ est.apellidos }}</div>
+      {% if est.carrera %}<div class="carnet__carrera">{{ est.carrera }}</div>{% endif %}
+      <div class="carnet__estado {{ 'carnet__estado--activo' if est.estado == 'ACTIVO' else 'carnet__estado--otro' }}">
+        {{ est.estado }}
+      </div>
+    </div>
+
+    <div class="carnet__datos">
+      <div class="dato dato--nie">
+        <div class="dato__label">NIE</div>
+        <div class="dato__valor">{{ est.nie }}</div>
+      </div>
+      {% if est.grado %}
+      <div class="dato">
+        <div class="dato__label">Grado</div>
+        <div class="dato__valor">{{ est.grado }}</div>
+      </div>
+      {% endif %}
+      {% if est.seccion %}
+      <div class="dato">
+        <div class="dato__label">Sección</div>
+        <div class="dato__valor">{{ est.seccion }}</div>
+      </div>
+      {% endif %}
+      {% if est.tipo_sangre %}
+      <div class="dato">
+        <div class="dato__label">Tipo de sangre</div>
+        <div class="dato__valor">{{ est.tipo_sangre }}</div>
+      </div>
+      {% endif %}
+      {% if est.telefono %}
+      <div class="dato">
+        <div class="dato__label">Teléfono</div>
+        <div class="dato__valor">{{ est.telefono }}</div>
+      </div>
+      {% endif %}
+      {% if est.correo %}
+      <div class="dato dato--full">
+        <div class="dato__label">Correo</div>
+        <div class="dato__valor">{{ est.correo }}</div>
+      </div>
+      {% endif %}
+      {% if est.fecha_ingreso %}
+      <div class="dato dato--full">
+        <div class="dato__label">Fecha de ingreso</div>
+        <div class="dato__valor">{{ est.fecha_ingreso }}</div>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="carnet__footer">
+      <span class="marca">{{ institucion }}</span> · documento generado dinámicamente
+    </div>
+  </div>
+</body>
+</html>

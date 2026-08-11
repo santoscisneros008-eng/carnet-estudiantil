@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Asistencia de {{ est.nombres }} {{ est.apellidos }} · {{ institucion }}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <div class="admin-shell">
+    <div class="admin-topbar">
+      <div>
+        <h1>{{ est.nombres }} {{ est.apellidos }}</h1>
+        <div class="institucion">NIE {{ est.nie }} · {{ est.grado or 'Sin salón asignado' }}{% if est.carrera %} · {{ est.carrera }}{% endif %}</div>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <a class="admin-link" href="{{ url_for('admin_asistencia_estudiante_pdf', nie=est.nie) }}">↓ Descargar PDF</a>
+        <a class="admin-link" href="{{ url_for('carnet', nie=est.nie) }}" target="_blank">Ver carné</a>
+        <a class="admin-link admin-link--ghost" href="{{ url_for('admin_asistencia') }}">← Asistencia de hoy</a>
+      </div>
+    </div>
+
+    <div class="admin-card">
+      {% if historial %}
+      <table class="admin-tabla">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Entrada</th>
+            <th>Salida</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for h in historial %}
+          <tr>
+            <td>{{ h.fecha.strftime('%d/%m/%Y') }}</td>
+            <td>{{ h.hora_entrada.strftime('%I:%M %p') if h.hora_entrada else '—' }}</td>
+            <td>{{ h.hora_salida.strftime('%I:%M %p') if h.hora_salida else '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+        <div class="admin-vacio">Este estudiante todavía no tiene marcaciones registradas.</div>
+      {% endif %}
+    </div>
+  </div>
+</body>
+</html>

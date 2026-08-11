@@ -1,0 +1,19 @@
+# Entorno virtual — cada quien crea el suyo con requirements.txt
+venv/
+.venv/
+env/
+
+# Variables de entorno con contraseñas reales — NUNCA subir esto
+.env
+
+# Archivos de Python
+__pycache__/
+*.pyc
+
+# QR generados localmente (ya no son necesarios, se generan al vuelo en /qr/<nie>.png)
+static/qr/*.png
+
+# Archivos del editor / sistema
+.vscode/
+.DS_Store
+Thumbs.db

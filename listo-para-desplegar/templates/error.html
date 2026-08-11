@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Carné no encontrado</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <div class="error-card">
+    <div class="error-card__icono">!</div>
+    <h1>Carné no encontrado</h1>
+    {% if nie %}
+      <p>No existe ningún estudiante registrado con el NIE <code>{{ nie }}</code>.</p>
+    {% else %}
+      <p>Esta dirección no corresponde a ningún carné.</p>
+    {% endif %}
+    <p>Verifica el código QR o consulta con administración académica.</p>
+  </div>
+</body>
+</html>
