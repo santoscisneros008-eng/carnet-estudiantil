@@ -23,6 +23,7 @@ from io import BytesIO
 
 import qrcode
 from flask import Flask, flash, redirect, render_template, request, send_file, session, url_for
+from PIL import Image
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 import psycopg2
@@ -72,6 +73,26 @@ def _norm(txt):
     return (txt or "").strip().lower()
 
 
+def procesar_foto(archivo):
+    """
+    Redimensiona y comprime la foto subida a un tamaño razonable para un
+    carné (máx. 500x500, formato JPEG). Devuelve (bytes, mimetype) o
+    (None, None) si no se subió ninguna foto o el archivo no es una imagen
+    válida.
+    """
+    if not archivo or not archivo.filename:
+        return None, None
+    try:
+        img = Image.open(archivo.stream)
+        img = img.convert("RGB")
+        img.thumbnail((500, 500))
+        buffer = BytesIO()
+        img.save(buffer, format="JPEG", quality=85)
+        return buffer.getvalue(), "image/jpeg"
+    except Exception:
+        return None, None
+
+
 # ---------------------------------------------------------------------------
 # Estudiantes
 # ---------------------------------------------------------------------------
@@ -84,14 +105,30 @@ def obtener_estudiante_por_nie(nie: str):
             cur.execute(
                 """
                 SELECT nie, nombres, apellidos, carrera, seccion, grado,
-                       correo, telefono, tipo_sangre, foto_url, estado,
-                       fecha_ingreso
+                       correo, telefono, estado, fecha_nacimiento,
+                       (foto IS NOT NULL) AS tiene_foto
                 FROM estudiantes
                 WHERE nie = %s
                 """,
                 (nie,),
             )
             return cur.fetchone()
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+def obtener_foto(nie: str):
+    """Devuelve (bytes, mimetype) de la foto de un estudiante, o (None, None)."""
+    conn = None
+    try:
+        conn = get_conn()
+        with conn.cursor() as cur:
+            cur.execute("SELECT foto, foto_tipo FROM estudiantes WHERE nie = %s", (nie,))
+            fila = cur.fetchone()
+            if fila is None or fila[0] is None:
+                return None, None
+            return bytes(fila[0]), fila[1]
     finally:
         if conn is not None:
             conn.close()
@@ -153,7 +190,7 @@ def agrupar_por_grado(filas):
     return grupos
 
 
-def crear_estudiante(datos: dict):
+def crear_estudiante(datos: dict, foto_bytes=None, foto_tipo=None):
     conn = None
     try:
         conn = get_conn()
@@ -162,8 +199,8 @@ def crear_estudiante(datos: dict):
                 """
                 INSERT INTO estudiantes
                     (nie, nombres, apellidos, carrera, seccion, grado,
-                     correo, telefono, tipo_sangre, estado, fecha_ingreso)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                     correo, telefono, estado, fecha_nacimiento, foto, foto_tipo)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 (
                     datos["nie"],
@@ -174,9 +211,10 @@ def crear_estudiante(datos: dict):
                     datos["grado"] or None,
                     datos["correo"] or None,
                     datos["telefono"] or None,
-                    datos["tipo_sangre"] or None,
                     datos["estado"],
-                    datos["fecha_ingreso"] or None,
+                    datos["fecha_nacimiento"] or None,
+                    psycopg2.Binary(foto_bytes) if foto_bytes else None,
+                    foto_tipo,
                 ),
             )
         conn.commit()
@@ -340,6 +378,19 @@ def requiere_login(vista):
     return envoltura
 
 
+def requiere_director(vista):
+    """Solo la cuenta de dirección puede pasar. Se coloca DESPUÉS de
+    @requiere_login (más cerca de la función) para que primero se valide
+    que haya sesión iniciada."""
+    @wraps(vista)
+    def envoltura(*args, **kwargs):
+        if not es_director():
+            flash("Esa acción solo está disponible para la cuenta de Dirección.", "error")
+            return redirect(url_for("admin_lista"))
+        return vista(*args, **kwargs)
+    return envoltura
+
+
 @app.route("/admin/login", methods=["GET", "POST"])
 def admin_login():
     error = None
@@ -391,6 +442,7 @@ def admin_lista():
 
 @app.route("/admin/nuevo", methods=["GET", "POST"])
 @requiere_login
+@requiere_director
 def admin_nuevo():
     salon_fijo = None if es_director() else grado_sesion()
     grados_existentes = obtener_grados_distintos()
@@ -405,9 +457,8 @@ def admin_nuevo():
             "grado": (salon_fijo or request.form.get("grado", "")).strip(),
             "correo": request.form.get("correo", "").strip(),
             "telefono": request.form.get("telefono", "").strip(),
-            "tipo_sangre": request.form.get("tipo_sangre", "").strip(),
             "estado": request.form.get("estado", "ACTIVO"),
-            "fecha_ingreso": request.form.get("fecha_ingreso", "").strip(),
+            "fecha_nacimiento": request.form.get("fecha_nacimiento", "").strip(),
         }
 
         if not datos["nie"] or not datos["nombres"] or not datos["apellidos"]:
@@ -427,7 +478,9 @@ def admin_nuevo():
         if datos["estado"] not in ESTADOS_VALIDOS:
             datos["estado"] = "ACTIVO"
 
-        ok, error = crear_estudiante(datos)
+        foto_bytes, foto_tipo = procesar_foto(request.files.get("foto"))
+
+        ok, error = crear_estudiante(datos, foto_bytes, foto_tipo)
         if not ok:
             flash(error, "error")
             return render_template(
@@ -456,6 +509,7 @@ def admin_nuevo():
 
 @app.route("/admin/eliminar/<nie>", methods=["POST"])
 @requiere_login
+@requiere_director
 def admin_eliminar(nie):
     estudiante = obtener_estudiante_por_nie(nie)
     if estudiante is None:
@@ -645,6 +699,15 @@ def qr_estudiante(nie):
     img.save(buffer, format="PNG")
     buffer.seek(0)
     return send_file(buffer, mimetype="image/png")
+
+
+@app.route("/foto/<nie>")
+def foto_estudiante(nie):
+    """Sirve la foto de perfil del estudiante guardada en la base de datos."""
+    foto_bytes, foto_tipo = obtener_foto(nie)
+    if foto_bytes is None:
+        return "", 404
+    return send_file(BytesIO(foto_bytes), mimetype=foto_tipo or "image/jpeg")
 
 
 # ---------------------------------------------------------------------------

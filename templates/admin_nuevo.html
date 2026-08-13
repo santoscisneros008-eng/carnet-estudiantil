@@ -23,7 +23,7 @@
     {% endwith %}
 
     <div class="admin-card">
-      <form method="post">
+      <form method="post" enctype="multipart/form-data">
         <div class="form-grid">
           <div class="campo">
             <label for="nie">NIE *</label>
@@ -75,21 +75,22 @@
           </div>
 
           <div class="campo">
-            <label for="tipo_sangre">Tipo de sangre</label>
-            <input type="text" id="tipo_sangre" name="tipo_sangre" value="{{ datos.tipo_sangre or '' }}">
+            <label for="fecha_nacimiento">Fecha de nacimiento</label>
+            <input type="date" id="fecha_nacimiento" name="fecha_nacimiento" value="{{ datos.fecha_nacimiento or '' }}">
           </div>
-          <div class="campo">
-            <label for="fecha_ingreso">Fecha de ingreso</label>
-            <input type="date" id="fecha_ingreso" name="fecha_ingreso" value="{{ datos.fecha_ingreso or '' }}">
-          </div>
-
           <div class="campo">
             <label for="correo">Correo</label>
             <input type="email" id="correo" name="correo" value="{{ datos.correo or '' }}">
           </div>
+
           <div class="campo">
             <label for="telefono">Teléfono</label>
             <input type="text" id="telefono" name="telefono" value="{{ datos.telefono or '' }}">
+          </div>
+
+          <div class="campo full">
+            <label for="foto">Foto de perfil</label>
+            <input type="file" id="foto" name="foto" accept="image/*">
           </div>
         </div>
 

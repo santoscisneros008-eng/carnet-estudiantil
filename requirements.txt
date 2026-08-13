@@ -2,5 +2,6 @@ Flask==3.0.3
 psycopg2-binary
 python-dotenv==1.0.1
 qrcode[pil]==7.4.2
+Pillow
 reportlab
 gunicorn

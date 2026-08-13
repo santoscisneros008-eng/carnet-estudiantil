@@ -22,7 +22,9 @@
       </div>
       <div style="display:flex; gap:8px;">
         <a class="admin-link" href="{{ url_for('admin_asistencia') }}">Asistencia</a>
+        {% if es_director %}
         <a class="admin-link" href="{{ url_for('admin_nuevo') }}">+ Agregar estudiante</a>
+        {% endif %}
         <a class="admin-link admin-link--ghost" href="{{ url_for('admin_logout') }}">Salir</a>
       </div>
     </div>
@@ -61,9 +63,8 @@
                 <th>Sección</th>
                 <th>Estado</th>
                 <th>Carné</th>
-                <th>QR</th>
                 <th>Asistencia</th>
-                <th></th>
+                {% if es_director %}<th></th>{% endif %}
               </tr>
             </thead>
             <tbody>
@@ -79,8 +80,8 @@
                   </span>
                 </td>
                 <td><a href="{{ url_for('carnet', nie=e.nie) }}" target="_blank">Ver carné →</a></td>
-                <td><a href="{{ url_for('qr_estudiante', nie=e.nie) }}" target="_blank">Ver QR →</a></td>
                 <td><a href="{{ url_for('admin_asistencia_estudiante', nie=e.nie) }}">Ver historial →</a></td>
+                {% if es_director %}
                 <td>
                   <form method="post"
                         action="{{ url_for('admin_eliminar', nie=e.nie) }}"
@@ -88,6 +89,7 @@
                     <button type="submit" class="btn-eliminar">Eliminar</button>
                   </form>
                 </td>
+                {% endif %}
               </tr>
               {% endfor %}
             </tbody>

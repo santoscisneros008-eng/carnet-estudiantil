@@ -33,8 +33,8 @@
         </g>
       </svg>
       <div class="carnet__foto">
-        {% if est.foto_url %}
-          <img src="{{ est.foto_url }}" alt="Foto de {{ est.nombres }}">
+        {% if est.tiene_foto %}
+          <img src="{{ url_for('foto_estudiante', nie=est.nie) }}" alt="Foto de {{ est.nombres }}">
         {% else %}
           {{ est.nombres[0] }}{{ est.apellidos[0] }}
         {% endif %}
@@ -66,12 +66,6 @@
         <div class="dato__valor">{{ est.seccion }}</div>
       </div>
       {% endif %}
-      {% if est.tipo_sangre %}
-      <div class="dato">
-        <div class="dato__label">Tipo de sangre</div>
-        <div class="dato__valor">{{ est.tipo_sangre }}</div>
-      </div>
-      {% endif %}
       {% if est.telefono %}
       <div class="dato">
         <div class="dato__label">Teléfono</div>
@@ -84,10 +78,10 @@
         <div class="dato__valor">{{ est.correo }}</div>
       </div>
       {% endif %}
-      {% if est.fecha_ingreso %}
+      {% if est.fecha_nacimiento %}
       <div class="dato dato--full">
-        <div class="dato__label">Fecha de ingreso</div>
-        <div class="dato__valor">{{ est.fecha_ingreso }}</div>
+        <div class="dato__label">Fecha de nacimiento</div>
+        <div class="dato__valor">{{ est.fecha_nacimiento }}</div>
       </div>
       {% endif %}
     </div>
