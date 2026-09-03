@@ -9,7 +9,7 @@
 <body>
   <div class="page-inicio">
     <h1>{{ institucion }}</h1>
-    <p>Sistema de carné digital de estudiantes. Cada estudiante tiene un carné accesible mediante su NIE o escaneando su código QR único.</p>
+    <p>Sistema de carné digital de estudiantes. Cada estudiante tiene un carné accesible mediante su NIE, tarjeta NFC o código QR.</p>
     <form class="buscar-form" action="/buscar" method="get" onsubmit="event.preventDefault(); window.location.href = '/student/' + document.getElementById('nie').value.trim();">
       <input id="nie" type="text" placeholder="Escribe un NIE, ej. N0001" autocomplete="off">
       <button type="submit">Ver carné</button>

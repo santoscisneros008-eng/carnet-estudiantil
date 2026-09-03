@@ -1,7 +1,7 @@
 """
 Utilidades compartidas para generar códigos QR y detectar la IP local.
-Usado tanto por generate_qr.py (script manual) como por app.py
-(generación automática al dar de alta un estudiante desde el formulario).
+Usado por generate_qr.py (script manual, para imprimir QR físicos con
+la IP local) y por la ruta dinámica /qr/<nie>.png en app.py.
 """
 
 import os
@@ -36,7 +36,7 @@ def generar_qr_para(nie: str, url: str, carpeta: str = CARPETA_QR) -> str:
     )
     qr.add_data(url)
     qr.make(fit=True)
-    img = qr.make_image(fill_color="#1B2A4A", back_color="white")
+    img = qr.make_image(fill_color="#6E1423", back_color="white")
     ruta = os.path.join(carpeta, f"{nie}.png")
     img.save(ruta)
     return ruta

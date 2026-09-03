@@ -3,14 +3,10 @@ Crea o actualiza una cuenta de administración: DIRECTOR (ve todos los
 salones) o PROFESOR (ve únicamente su propio salón/grado).
 
 La contraseña nunca se guarda en texto plano — este script la encripta
-(hashea) antes de mandarla a la base de datos, por eso no se hace con
-un INSERT normal en PG Studio.
+(hashea) antes de mandarla a la base de datos.
 
 Uso:
     python crear_admin.py
-
-Puedes correrlo varias veces: una para el director, y una por cada
-profesor/salón que necesites.
 """
 
 import getpass

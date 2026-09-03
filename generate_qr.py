@@ -1,14 +1,18 @@
 """
-Genera un código QR por cada estudiante registrado en la base de datos.
+Genera un código QR por cada estudiante, como archivo PNG local — útil
+si quieres imprimir los QR físicos como respaldo (por ejemplo, para
+pegarlos en un carné de papel o una lista).
 
-Cada QR apunta a: http://<IP_LOCAL_DE_ESTA_PC>:<PUERTO>/student/<nie>
+Nota: esto es un respaldo opcional. El QR también se puede ver en
+cualquier momento sin correr este script, entrando directamente a
+/qr/<NIE>.png en el sitio (funciona local o ya desplegado, se genera
+al vuelo).
 
-Uso (con la PC ya conectada a la misma red donde estarán los celulares):
+Uso:
     python generate_qr.py
 
-Los PNG resultantes se guardan en static/qr/<nie>.png
-Ejecútalo de nuevo cada vez que cambie la IP de tu PC (por ejemplo,
-si te conectas a otra red Wi-Fi), porque la URL codificada cambiaría.
+Los PNG se guardan en static/qr/<nie>.png, apuntando a la IP local de
+esta PC. Vuelve a correrlo si cambias de red Wi-Fi.
 """
 
 import os

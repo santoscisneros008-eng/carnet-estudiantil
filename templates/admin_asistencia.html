@@ -20,8 +20,7 @@
       <form method="get" class="asistencia-filtro">
         <div class="campo">
           <label for="fecha">Fecha</label>
-          <input type="date" id="fecha" name="fecha" value="{{ fecha.isoformat() }}" max="{{ hoy.isoformat() }}"
-                 onchange="this.form.submit()">
+          <input type="date" id="fecha" name="fecha" value="{{ fecha.isoformat() }}" max="{{ hoy.isoformat() }}" onchange="this.form.submit()">
         </div>
         {% if es_director %}
         <div class="campo">
@@ -46,15 +45,7 @@
         <div class="salon-titulo">{{ salon }} <span class="salon-conteo">({{ lista|length }})</span></div>
         <div class="admin-card">
           <table class="admin-tabla">
-            <thead>
-              <tr>
-                <th>NIE</th>
-                <th>Nombre completo</th>
-                <th>Entrada</th>
-                <th>Salida</th>
-                <th>Asistencia</th>
-              </tr>
-            </thead>
+            <thead><tr><th>NIE</th><th>Nombre completo</th><th>Entrada</th><th>Salida</th><th>Asistencia</th></tr></thead>
             <tbody>
               {% for r in lista %}
               <tr>
@@ -77,9 +68,7 @@
       </div>
       {% endfor %}
     {% else %}
-      <div class="admin-card">
-        <div class="admin-vacio">No hay estudiantes registrados en este salón todavía.</div>
-      </div>
+      <div class="admin-card"><div class="admin-vacio">No hay estudiantes registrados en este salón todavía.</div></div>
     {% endif %}
   </div>
 </body>

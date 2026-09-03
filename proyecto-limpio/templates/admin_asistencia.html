@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Asistencia · {{ institucion }}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <div class="admin-shell">
+    <div class="admin-topbar">
+      <div>
+        <h1>Asistencia</h1>
+        <div class="institucion">{{ institucion }}</div>
+      </div>
+      <a class="admin-link admin-link--ghost" href="{{ url_for('admin_lista') }}">← Estudiantes</a>
+    </div>
+
+    <div class="admin-card">
+      <form method="get" class="asistencia-filtro">
+        <div class="campo">
+          <label for="fecha">Fecha</label>
+          <input type="date" id="fecha" name="fecha" value="{{ fecha.isoformat() }}" max="{{ hoy.isoformat() }}" onchange="this.form.submit()">
+        </div>
+        {% if es_director %}
+        <div class="campo">
+          <label for="grado">Salón</label>
+          <select id="grado" name="grado" onchange="this.form.submit()">
+            <option value="" {{ 'selected' if not grado_filtro }}>Todos los salones</option>
+            {% for g in grados_existentes %}
+              <option value="{{ g }}" {{ 'selected' if grado_filtro == g }}>{{ g }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        {% endif %}
+        {% if fecha == hoy %}
+          <span class="pill-mini pill-mini--activo" style="align-self:end; margin-bottom:10px;">Hoy</span>
+        {% endif %}
+      </form>
+    </div>
+
+    {% if grupos %}
+      {% for salon, lista in grupos.items() %}
+      <div class="salon-seccion">
+        <div class="salon-titulo">{{ salon }} <span class="salon-conteo">({{ lista|length }})</span></div>
+        <div class="admin-card">
+          <table class="admin-tabla">
+            <thead><tr><th>NIE</th><th>Nombre completo</th><th>Entrada</th><th>Salida</th><th>Asistencia</th></tr></thead>
+            <tbody>
+              {% for r in lista %}
+              <tr>
+                <td>{{ r.nie }}</td>
+                <td><a href="{{ url_for('admin_asistencia_estudiante', nie=r.nie) }}">{{ r.nombres }} {{ r.apellidos }} →</a></td>
+                <td>{{ r.hora_entrada.strftime('%I:%M %p') if r.hora_entrada else '—' }}</td>
+                <td>{{ r.hora_salida.strftime('%I:%M %p') if r.hora_salida else '—' }}</td>
+                <td>
+                  {% if r.hora_entrada or r.hora_salida %}
+                    <span class="pill-mini pill-mini--activo">Asistió</span>
+                  {% else %}
+                    <span class="pill-mini pill-mini--otro">No asistió</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="admin-card"><div class="admin-vacio">No hay estudiantes registrados en este salón todavía.</div></div>
+    {% endif %}
+  </div>
+</body>
+</html>

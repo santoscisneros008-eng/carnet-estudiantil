@@ -11,11 +11,7 @@
     <div class="admin-card">
       <h1>Panel de administración</h1>
       <div class="sub">{{ institucion }}</div>
-
-      {% if error %}
-        <div class="flash flash--error">{{ error }}</div>
-      {% endif %}
-
+      {% if error %}<div class="flash flash--error">{{ error }}</div>{% endif %}
       <form method="post">
         <div class="campo">
           <label for="usuario">Usuario</label>
@@ -26,10 +22,11 @@
           <input type="password" id="password" name="password" required autocomplete="current-password">
         </div>
         <div class="form-acciones">
-          <button type="submit" class="btn-primario">Entrar</button>
+          <button type="submit" class="btn-primario" data-cargando="Entrando...">Entrar</button>
         </div>
       </form>
     </div>
   </div>
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>

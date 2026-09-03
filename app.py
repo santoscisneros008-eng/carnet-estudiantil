@@ -1,19 +1,20 @@
 """
 Carné Digital de Estudiantes
 =============================
-Aplicación Flask liviana que consulta un estudiante por su NIE en una
-base de datos PostgreSQL alojada en Aiven y renderiza su carné digital.
+Aplicación Flask que consulta un estudiante por su NIE en una base de
+datos PostgreSQL (Aiven) y renderiza su carné digital.
 
-Incluye un panel de administración con cuentas por rol:
-  - DIRECTOR: ve todos los salones, siempre organizados por salón.
-  - PROFESOR: ve y administra únicamente su propio salón (grado).
+Panel de administración con 2 roles:
+  - DIRECTOR: ve y administra todos los salones (agrupados por salón).
+  - PROFESOR: solo ve su propio salón; no puede agregar ni eliminar
+    estudiantes (solo Dirección puede).
 
-Al guardar un estudiante nuevo, su código QR se genera automáticamente.
-Al abrir el carné (QR hoy, NFC en el futuro), se registra automáticamente
-la hora de entrada o salida según la hora del día.
+Al abrir el carné (QR, NFC, o entrada manual) se registra automática-
+mente la hora de entrada o salida, según la hora del día.
 
-Pensada para correr localmente en una PC con Windows y ser accedida
-desde celulares conectados a la MISMA red Wi-Fi.
+El QR de cada estudiante se genera al vuelo en /qr/<nie>.png — no se
+guardan archivos en el servidor (importante para Render, cuyo disco no
+es persistente entre despliegues).
 """
 
 import os
@@ -37,26 +38,25 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import cm
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
-from qr_utils import generar_qr_para_nie, get_local_ip
+from qr_utils import get_local_ip
 
 load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "cambia-esta-clave-en-produccion")
-# Permite que Flask detecte correctamente el dominio real (https, host) cuando
-# corre detrás del proxy de Render (o cualquier otro hosting con proxy).
+# Permite que Flask detecte correctamente el dominio real (https, host)
+# cuando corre detrás del proxy de Render.
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 NOMBRE_INSTITUCION = os.getenv("NOMBRE_INSTITUCION", "Institución Educativa")
 
-# Hora del día (0-23) que separa "entrada" de "salida" al abrir el carné.
+# Hora (0-23) que separa "entrada" de "salida" al abrir el carné.
 HORA_CORTE_ASISTENCIA = int(os.getenv("HORA_CORTE_ASISTENCIA", "12"))
 
 ESTADOS_VALIDOS = ("ACTIVO", "INACTIVO", "GRADUADO")
 
 
 def get_conn():
-    """Abre una conexión nueva contra la base de datos de Aiven."""
     return psycopg2.connect(
         host=os.getenv("PGHOST"),
         port=os.getenv("PGPORT", "5432"),
@@ -76,9 +76,8 @@ def _norm(txt):
 def procesar_foto(archivo):
     """
     Redimensiona y comprime la foto subida a un tamaño razonable para un
-    carné (máx. 500x500, formato JPEG). Devuelve (bytes, mimetype) o
-    (None, None) si no se subió ninguna foto o el archivo no es una imagen
-    válida.
+    carné (máx. 500x500, JPEG). Devuelve (bytes, mimetype) o (None, None)
+    si no se subió ninguna foto o el archivo no es una imagen válida.
     """
     if not archivo or not archivo.filename:
         return None, None
@@ -135,8 +134,8 @@ def obtener_foto(nie: str):
 
 
 def listar_estudiantes(grado: str = None):
-    """Si `grado` viene dado, filtra solo ese salón (comparación sin distinguir
-    mayúsculas/espacios). Si es None, devuelve todos, ordenados por salón."""
+    """Si `grado` viene dado, filtra solo ese salón. Si es None, devuelve
+    todos, ordenados por salón (para poder agruparlos en pantalla)."""
     conn = None
     try:
         conn = get_conn()
@@ -166,7 +165,6 @@ def listar_estudiantes(grado: str = None):
 
 
 def obtener_grados_distintos():
-    """Lista de salones ya usados en la base, para autocompletar/filtrar."""
     conn = None
     try:
         conn = get_conn()
@@ -181,8 +179,6 @@ def obtener_grados_distintos():
 
 
 def agrupar_por_grado(filas):
-    """Agrupa una lista de estudiantes/registros (dict-like, con clave 'grado')
-    en un diccionario ordenado {grado: [filas...]}."""
     grupos = {}
     for fila in filas:
         clave = fila.get("grado") or "Sin salón asignado"
@@ -358,12 +354,10 @@ def es_director() -> bool:
 
 
 def grado_sesion():
-    """Salón de la cuenta logueada. None si es director (ve todos)."""
     return session.get("admin_grado")
 
 
 def puede_administrar(estudiante) -> bool:
-    """True si la cuenta logueada tiene permiso sobre este estudiante."""
     if es_director():
         return True
     return _norm(estudiante.get("grado")) == _norm(grado_sesion())
@@ -379,9 +373,7 @@ def requiere_login(vista):
 
 
 def requiere_director(vista):
-    """Solo la cuenta de dirección puede pasar. Se coloca DESPUÉS de
-    @requiere_login (más cerca de la función) para que primero se valide
-    que haya sesión iniciada."""
+    """Solo la cuenta de Dirección puede pasar (agregar/eliminar estudiantes)."""
     @wraps(vista)
     def envoltura(*args, **kwargs):
         if not es_director():
@@ -421,11 +413,7 @@ def admin_logout():
 @app.route("/admin")
 @requiere_login
 def admin_lista():
-    if es_director():
-        grado_filtro = request.args.get("grado") or None
-    else:
-        grado_filtro = grado_sesion()
-
+    grado_filtro = (request.args.get("grado") or None) if es_director() else grado_sesion()
     estudiantes = listar_estudiantes(grado_filtro)
     grupos = agrupar_por_grado(estudiantes)
 
@@ -444,7 +432,7 @@ def admin_lista():
 @requiere_login
 @requiere_director
 def admin_nuevo():
-    salon_fijo = None if es_director() else grado_sesion()
+    # Solo Dirección llega aquí, así que siempre se elige el salón libremente.
     grados_existentes = obtener_grados_distintos()
 
     if request.method == "POST":
@@ -454,7 +442,7 @@ def admin_nuevo():
             "apellidos": request.form.get("apellidos", "").strip(),
             "carrera": request.form.get("carrera", "").strip(),
             "seccion": request.form.get("seccion", "").strip(),
-            "grado": (salon_fijo or request.form.get("grado", "")).strip(),
+            "grado": request.form.get("grado", "").strip(),
             "correo": request.form.get("correo", "").strip(),
             "telefono": request.form.get("telefono", "").strip(),
             "estado": request.form.get("estado", "ACTIVO"),
@@ -463,17 +451,13 @@ def admin_nuevo():
 
         if not datos["nie"] or not datos["nombres"] or not datos["apellidos"]:
             flash("NIE, nombres y apellidos son obligatorios.", "error")
-            return render_template(
-                "admin_nuevo.html", institucion=NOMBRE_INSTITUCION, datos=datos,
-                salon_fijo=salon_fijo, grados_existentes=grados_existentes,
-            )
+            return render_template("admin_nuevo.html", institucion=NOMBRE_INSTITUCION,
+                                    datos=datos, grados_existentes=grados_existentes)
 
         if not datos["grado"]:
             flash("Debes indicar el grado/salón del estudiante.", "error")
-            return render_template(
-                "admin_nuevo.html", institucion=NOMBRE_INSTITUCION, datos=datos,
-                salon_fijo=salon_fijo, grados_existentes=grados_existentes,
-            )
+            return render_template("admin_nuevo.html", institucion=NOMBRE_INSTITUCION,
+                                    datos=datos, grados_existentes=grados_existentes)
 
         if datos["estado"] not in ESTADOS_VALIDOS:
             datos["estado"] = "ACTIVO"
@@ -483,51 +467,22 @@ def admin_nuevo():
         ok, error = crear_estudiante(datos, foto_bytes, foto_tipo)
         if not ok:
             flash(error, "error")
-            return render_template(
-                "admin_nuevo.html", institucion=NOMBRE_INSTITUCION, datos=datos,
-                salon_fijo=salon_fijo, grados_existentes=grados_existentes,
-            )
-
-        try:
-            puerto = os.getenv("FLASK_PORT", "5000")
-            generar_qr_para_nie(datos["nie"], puerto)
-        except Exception:
-            flash(
-                "El estudiante se guardó, pero no se pudo generar su QR automáticamente. "
-                "Puedes correr generate_qr.py manualmente.",
-                "aviso",
-            )
+            return render_template("admin_nuevo.html", institucion=NOMBRE_INSTITUCION,
+                                    datos=datos, grados_existentes=grados_existentes)
 
         flash(f"Estudiante '{datos['nombres']} {datos['apellidos']}' agregado correctamente.", "exito")
         return redirect(url_for("admin_lista"))
 
-    return render_template(
-        "admin_nuevo.html", institucion=NOMBRE_INSTITUCION, datos={},
-        salon_fijo=salon_fijo, grados_existentes=grados_existentes,
-    )
+    return render_template("admin_nuevo.html", institucion=NOMBRE_INSTITUCION,
+                            datos={}, grados_existentes=grados_existentes)
 
 
 @app.route("/admin/eliminar/<nie>", methods=["POST"])
 @requiere_login
 @requiere_director
 def admin_eliminar(nie):
-    estudiante = obtener_estudiante_por_nie(nie)
-    if estudiante is None:
-        flash(f"No se encontró ningún estudiante con NIE '{nie}'.", "error")
-        return redirect(url_for("admin_lista"))
-
-    if not puede_administrar(estudiante):
-        flash("No tienes permiso para eliminar estudiantes de otro salón.", "error")
-        return redirect(url_for("admin_lista"))
-
     borrado = eliminar_estudiante(nie)
     if borrado:
-        ruta_qr = os.path.join("static", "qr", f"{nie}.png")
-        if os.path.exists(ruta_qr):
-            try:
-                os.remove(ruta_qr)
-            except OSError:
-                pass
         flash(f"Estudiante con NIE '{nie}' eliminado.", "exito")
     else:
         flash(f"No se encontró ningún estudiante con NIE '{nie}'.", "error")
@@ -543,10 +498,7 @@ def admin_asistencia():
     except ValueError:
         fecha = date.today()
 
-    if es_director():
-        grado_filtro = request.args.get("grado") or None
-    else:
-        grado_filtro = grado_sesion()
+    grado_filtro = (request.args.get("grado") or None) if es_director() else grado_sesion()
 
     registros = listar_asistencia_por_fecha(fecha, grado_filtro)
     grupos = agrupar_por_grado(registros)
@@ -573,12 +525,8 @@ def admin_asistencia_estudiante(nie):
         flash("No tienes permiso para ver la asistencia de otro salón.", "error")
         return redirect(url_for("admin_lista"))
     historial = obtener_historial_asistencia(nie)
-    return render_template(
-        "admin_asistencia_estudiante.html",
-        est=estudiante,
-        historial=historial,
-        institucion=NOMBRE_INSTITUCION,
-    )
+    return render_template("admin_asistencia_estudiante.html", est=estudiante,
+                            historial=historial, institucion=NOMBRE_INSTITUCION)
 
 
 @app.route("/admin/asistencia/<nie>/pdf")
@@ -600,29 +548,21 @@ def admin_asistencia_estudiante_pdf(nie):
 
     buffer = BytesIO()
     doc = SimpleDocTemplate(
-        buffer,
-        pagesize=letter,
-        topMargin=2 * cm,
-        bottomMargin=2 * cm,
-        leftMargin=2 * cm,
-        rightMargin=2 * cm,
+        buffer, pagesize=letter,
+        topMargin=2 * cm, bottomMargin=2 * cm, leftMargin=2 * cm, rightMargin=2 * cm,
         title=f"Asistencia de {estudiante['nombres']} {estudiante['apellidos']}",
     )
     estilos = getSampleStyleSheet()
-    estilo_institucion = ParagraphStyle(
-        "Institucion", parent=estilos["Normal"], textColor=color_pizarra, fontSize=10, spaceAfter=6
-    )
-    estilo_titulo = ParagraphStyle(
-        "TituloVino", parent=estilos["Title"], textColor=color_vino, fontSize=18, spaceAfter=10
-    )
+    estilo_institucion = ParagraphStyle("Institucion", parent=estilos["Normal"],
+                                         textColor=color_pizarra, fontSize=10, spaceAfter=6)
+    estilo_titulo = ParagraphStyle("TituloVino", parent=estilos["Title"],
+                                    textColor=color_vino, fontSize=18, spaceAfter=10)
     estilo_info = ParagraphStyle("Info", parent=estilos["Normal"], fontSize=10.5, leading=16)
 
-    contenido = []
-    contenido.append(Paragraph(NOMBRE_INSTITUCION, estilo_institucion))
-    contenido.append(
-        Paragraph(f"Reporte de asistencia · {estudiante['nombres']} {estudiante['apellidos']}", estilo_titulo)
-    )
-
+    contenido = [
+        Paragraph(NOMBRE_INSTITUCION, estilo_institucion),
+        Paragraph(f"Reporte de asistencia · {estudiante['nombres']} {estudiante['apellidos']}", estilo_titulo),
+    ]
     info_lineas = [
         f"<b>NIE:</b> {estudiante['nie']}",
         f"<b>Salón / Grado:</b> {estudiante['grado'] or '—'}",
@@ -637,81 +577,36 @@ def admin_asistencia_estudiante_pdf(nie):
     datos_tabla = [["Fecha", "Entrada", "Salida"]]
     if historial:
         for h in historial:
-            datos_tabla.append(
-                [
-                    h["fecha"].strftime("%d/%m/%Y"),
-                    h["hora_entrada"].strftime("%I:%M %p") if h["hora_entrada"] else "—",
-                    h["hora_salida"].strftime("%I:%M %p") if h["hora_salida"] else "—",
-                ]
-            )
+            datos_tabla.append([
+                h["fecha"].strftime("%d/%m/%Y"),
+                h["hora_entrada"].strftime("%I:%M %p") if h["hora_entrada"] else "—",
+                h["hora_salida"].strftime("%I:%M %p") if h["hora_salida"] else "—",
+            ])
     else:
         datos_tabla.append(["Sin marcaciones registradas todavía.", "", ""])
 
     tabla = Table(datos_tabla, colWidths=[6 * cm, 5 * cm, 5 * cm])
-    tabla.setStyle(
-        TableStyle(
-            [
-                ("BACKGROUND", (0, 0), (-1, 0), color_vino),
-                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTSIZE", (0, 0), (-1, -1), 10),
-                ("TOPPADDING", (0, 0), (-1, 0), 8),
-                ("BOTTOMPADDING", (0, 0), (-1, 0), 8),
-                ("GRID", (0, 0), (-1, -1), 0.5, color_linea),
-                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, color_franja]),
-                ("ALIGN", (1, 0), (-1, -1), "CENTER"),
-            ]
-        )
-    )
+    tabla.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), color_vino),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 10),
+        ("TOPPADDING", (0, 0), (-1, 0), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, 0), 8),
+        ("GRID", (0, 0), (-1, -1), 0.5, color_linea),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, color_franja]),
+        ("ALIGN", (1, 0), (-1, -1), "CENTER"),
+    ]))
     contenido.append(tabla)
 
     doc.build(contenido)
     buffer.seek(0)
-
     nombre_archivo = f"asistencia_{estudiante['nie']}.pdf"
     return send_file(buffer, mimetype="application/pdf", as_attachment=True, download_name=nombre_archivo)
 
 
-@app.route("/qr/<nie>.png")
-def qr_estudiante(nie):
-    """
-    Genera el QR de un estudiante al vuelo (sin guardar archivos en disco),
-    apuntando siempre al dominio real desde donde se está accediendo —
-    funciona igual en local (IP de tu PC) que ya subido a internet
-    (tu dominio de Render), sin necesitar reconfigurar nada.
-    """
-    estudiante = obtener_estudiante_por_nie(nie)
-    if estudiante is None:
-        return "", 404
-
-    url = url_for("carnet", nie=nie, _external=True)
-    qr = qrcode.QRCode(
-        version=None,
-        error_correction=qrcode.constants.ERROR_CORRECT_M,
-        box_size=10,
-        border=4,
-    )
-    qr.add_data(url)
-    qr.make(fit=True)
-    img = qr.make_image(fill_color="#6E1423", back_color="white")
-
-    buffer = BytesIO()
-    img.save(buffer, format="PNG")
-    buffer.seek(0)
-    return send_file(buffer, mimetype="image/png")
-
-
-@app.route("/foto/<nie>")
-def foto_estudiante(nie):
-    """Sirve la foto de perfil del estudiante guardada en la base de datos."""
-    foto_bytes, foto_tipo = obtener_foto(nie)
-    if foto_bytes is None:
-        return "", 404
-    return send_file(BytesIO(foto_bytes), mimetype=foto_tipo or "image/jpeg")
-
-
 # ---------------------------------------------------------------------------
-# Rutas públicas (carné)
+# Rutas públicas (carné, QR, foto)
 # ---------------------------------------------------------------------------
 
 @app.route("/")
@@ -729,6 +624,35 @@ def carnet(nie):
     if not session.get("admin_usuario"):
         registrar_asistencia(nie)
     return render_template("carnet.html", est=estudiante, institucion=NOMBRE_INSTITUCION)
+
+
+@app.route("/qr/<nie>.png")
+def qr_estudiante(nie):
+    """QR generado al vuelo (respaldo del NFC) — usa siempre el dominio
+    real desde donde se accede, sin depender de archivos guardados."""
+    estudiante = obtener_estudiante_por_nie(nie)
+    if estudiante is None:
+        return "", 404
+
+    url = url_for("carnet", nie=nie, _external=True)
+    qr = qrcode.QRCode(version=None, error_correction=qrcode.constants.ERROR_CORRECT_M,
+                        box_size=10, border=4)
+    qr.add_data(url)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="#6E1423", back_color="white")
+
+    buffer = BytesIO()
+    img.save(buffer, format="PNG")
+    buffer.seek(0)
+    return send_file(buffer, mimetype="image/png")
+
+
+@app.route("/foto/<nie>")
+def foto_estudiante(nie):
+    foto_bytes, foto_tipo = obtener_foto(nie)
+    if foto_bytes is None:
+        return "", 404
+    return send_file(BytesIO(foto_bytes), mimetype=foto_tipo or "image/jpeg")
 
 
 @app.errorhandler(404)

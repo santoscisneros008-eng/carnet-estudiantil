@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agregar estudiante · {{ institucion }}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <div class="admin-shell">
+    <div class="admin-topbar">
+      <div>
+        <h1>Agregar estudiante</h1>
+        <div class="institucion">{{ institucion }}</div>
+      </div>
+      <a class="admin-link admin-link--ghost" href="{{ url_for('admin_lista') }}">← Volver a la lista</a>
+    </div>
+
+    {% with mensajes = get_flashed_messages(with_categories=true) %}
+      {% for categoria, texto in mensajes %}
+        <div class="flash flash--{{ categoria }}">{{ texto }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="admin-card">
+      <form method="post" enctype="multipart/form-data">
+        <div class="form-grid">
+          <div class="campo">
+            <label for="nie">NIE *</label>
+            <input type="text" id="nie" name="nie" value="{{ datos.nie or '' }}" required>
+          </div>
+          <div class="campo">
+            <label for="estado">Estado</label>
+            <select id="estado" name="estado">
+              <option value="ACTIVO" {{ 'selected' if datos.estado == 'ACTIVO' or not datos.estado }}>Activo</option>
+              <option value="INACTIVO" {{ 'selected' if datos.estado == 'INACTIVO' }}>Inactivo</option>
+              <option value="GRADUADO" {{ 'selected' if datos.estado == 'GRADUADO' }}>Graduado</option>
+            </select>
+          </div>
+
+          <div class="campo">
+            <label for="nombres">Nombres *</label>
+            <input type="text" id="nombres" name="nombres" value="{{ datos.nombres or '' }}" required>
+          </div>
+          <div class="campo">
+            <label for="apellidos">Apellidos *</label>
+            <input type="text" id="apellidos" name="apellidos" value="{{ datos.apellidos or '' }}" required>
+          </div>
+
+          <div class="campo full">
+            <label for="grado">Salón / Grado *</label>
+            <input type="text" id="grado" name="grado" list="grados-existentes" value="{{ datos.grado or '' }}" required placeholder="Ej. Primer Año, Segundo Año...">
+            <datalist id="grados-existentes">
+              {% for g in grados_existentes %}
+                <option value="{{ g }}">
+              {% endfor %}
+            </datalist>
+          </div>
+
+          <div class="campo">
+            <label for="carrera">Carrera</label>
+            <input type="text" id="carrera" name="carrera" value="{{ datos.carrera or '' }}">
+          </div>
+          <div class="campo">
+            <label for="seccion">Sección</label>
+            <input type="text" id="seccion" name="seccion" value="{{ datos.seccion or '' }}">
+          </div>
+
+          <div class="campo">
+            <label for="fecha_nacimiento">Fecha de nacimiento</label>
+            <input type="date" id="fecha_nacimiento" name="fecha_nacimiento" value="{{ datos.fecha_nacimiento or '' }}">
+          </div>
+          <div class="campo">
+            <label for="correo">Correo</label>
+            <input type="email" id="correo" name="correo" value="{{ datos.correo or '' }}">
+          </div>
+
+          <div class="campo">
+            <label for="telefono">Teléfono</label>
+            <input type="text" id="telefono" name="telefono" value="{{ datos.telefono or '' }}">
+          </div>
+
+          <div class="campo full">
+            <label for="foto">Foto de perfil</label>
+            <input type="file" id="foto" name="foto" accept="image/*">
+          </div>
+        </div>
+
+        <div class="form-acciones">
+          <button type="submit" class="btn-primario">Guardar estudiante</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</body>
+</html>

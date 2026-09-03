@@ -47,13 +47,6 @@
             <input type="text" id="apellidos" name="apellidos" value="{{ datos.apellidos or '' }}" required>
           </div>
 
-          {% if salon_fijo %}
-          <div class="campo full">
-            <label>Salón / Grado</label>
-            <input type="text" value="{{ salon_fijo }}" disabled>
-            <input type="hidden" name="grado" value="{{ salon_fijo }}">
-          </div>
-          {% else %}
           <div class="campo full">
             <label for="grado">Salón / Grado *</label>
             <input type="text" id="grado" name="grado" list="grados-existentes" value="{{ datos.grado or '' }}" required placeholder="Ej. Primer Año, Segundo Año...">
@@ -63,7 +56,6 @@
               {% endfor %}
             </datalist>
           </div>
-          {% endif %}
 
           <div class="campo">
             <label for="carrera">Carrera</label>
