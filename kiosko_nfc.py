@@ -13,6 +13,7 @@ detenerlo.
 Requiere: pip install pyscard   (Flask ya lo tienes instalado)
 """
 
+import base64
 import os
 import socket
 import sys
@@ -42,6 +43,21 @@ SEGUNDOS_ENTRE_REINTENTOS = 1.5
 
 estado_lock = threading.Lock()
 estado = {"version": 0, "nie": None, "mensaje": None}
+
+
+def cargar_logo_base64():
+    """
+    Incrusta el escudo institucional directamente en la página del kiosco
+    (como texto base64), para no depender de ninguna ruta web externa —
+    esta pantalla la sirve un mini-servidor aparte, sin conexión con
+    app.py ni con Render.
+    """
+    ruta = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "img", "logo-100-anos.png")
+    try:
+        with open(ruta, "rb") as f:
+            return "data:image/png;base64," + base64.b64encode(f.read()).decode("ascii")
+    except FileNotFoundError:
+        return ""
 
 # Guardamos la IP de la base de datos ya resuelta, para no tener que
 # volver a preguntarle a internet "¿cuál es la dirección de este nombre?"
@@ -195,7 +211,10 @@ PAGINA_KIOSKO = """
     margin: 0 auto 22px;
     display: flex; align-items: center; justify-content: center;
     font-size: 38px;
+    background: white;
+    overflow: hidden;
   }
+  #espera .icono img { width: 100%; height: 100%; object-fit: contain; padding: 6px; box-sizing: border-box; }
   #espera h1 { font-size: 22px; font-weight: 600; margin-bottom: 8px; letter-spacing: 0.02em; }
   #espera p { color: #d9c9a8; font-size: 14px; }
   #mensaje-error { margin-top: 18px; color: #ffb4a0; font-size: 13px; min-height: 18px; }
@@ -204,7 +223,7 @@ PAGINA_KIOSKO = """
 </head>
 <body>
   <div id="espera">
-    <div class="icono">&#128179;</div>
+    <div class="icono">__ICONO_HTML__</div>
     <h1>Sistema de Carné Digital</h1>
     <p>Acerca tu tarjeta al lector...</p>
     <div id="mensaje-error"></div>
@@ -249,7 +268,13 @@ setInterval(revisar, 1000);
 
 @app.route("/")
 def kiosko():
-    return PAGINA_KIOSKO.replace("__SITIO_URL__", SITIO_URL)
+    logo = cargar_logo_base64()
+    icono_html = f'<img src="{logo}" alt="Escudo institucional">' if logo else "&#128179;"
+    return (
+        PAGINA_KIOSKO
+        .replace("__SITIO_URL__", SITIO_URL)
+        .replace("__ICONO_HTML__", icono_html)
+    )
 
 
 @app.route("/estado")

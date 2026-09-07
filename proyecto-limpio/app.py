@@ -18,7 +18,7 @@ es persistente entre despliegues).
 """
 
 import os
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from functools import wraps
 from io import BytesIO
 
@@ -328,6 +328,19 @@ def obtener_historial_asistencia(nie: str):
     finally:
         if conn is not None:
             conn.close()
+            hoy = date.today()
+    historial = []
+    dia = hoy
+    while dia >= fecha_inicio:
+        if dia.weekday() < 5:  # 0=lunes ... 4=viernes (se saltan sábado y domingo)
+            marcacion = marcaciones.get(dia)
+            historial.append({
+                "fecha": dia,
+                "hora_entrada": marcacion["hora_entrada"] if marcacion else None,
+                "hora_salida": marcacion["hora_salida"] if marcacion else None,
+            })
+        dia -= timedelta(days=1)
+    return historial
 
 
 # ---------------------------------------------------------------------------
@@ -577,11 +590,16 @@ def admin_asistencia_estudiante_pdf(nie):
     datos_tabla = [["Fecha", "Entrada", "Salida"]]
     if historial:
         for h in historial:
-            datos_tabla.append([
-                h["fecha"].strftime("%d/%m/%Y"),
-                h["hora_entrada"].strftime("%I:%M %p") if h["hora_entrada"] else "—",
-                h["hora_salida"].strftime("%I:%M %p") if h["hora_salida"] else "—",
-            ])
+            if h["hora_entrada"] or h["hora_salida"]:
+                datos_tabla.append(
+                    [
+                        h["fecha"].strftime("%d/%m/%Y"),
+                        h["hora_entrada"].strftime("%I:%M %p") if h["hora_entrada"] else "—",
+                        h["hora_salida"].strftime("%I:%M %p") if h["hora_salida"] else "—",
+                    ]
+                )
+            else:
+                datos_tabla.append([h["fecha"].strftime("%d/%m/%Y"), "Inasistencia", ""])
     else:
         datos_tabla.append(["Sin marcaciones registradas todavía.", "", ""])
 
