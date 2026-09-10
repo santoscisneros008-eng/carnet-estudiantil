@@ -18,7 +18,8 @@ es persistente entre despliegues).
 """
 
 import os
-from datetime import date, datetime
+import calendar
+from datetime import date, datetime, timedelta
 from functools import wraps
 from io import BytesIO
 
@@ -54,6 +55,11 @@ NOMBRE_INSTITUCION = os.getenv("NOMBRE_INSTITUCION", "Institución Educativa")
 HORA_CORTE_ASISTENCIA = int(os.getenv("HORA_CORTE_ASISTENCIA", "12"))
 
 ESTADOS_VALIDOS = ("ACTIVO", "INACTIVO", "GRADUADO")
+
+MESES_ES = [
+    "", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+    "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+]
 
 
 def get_conn():
@@ -310,24 +316,61 @@ def listar_asistencia_por_fecha(fecha, grado: str = None):
             conn.close()
 
 
-def obtener_historial_asistencia(nie: str):
+def obtener_historial_asistencia(nie: str, anio: int, mes: int):
+    """
+    Devuelve el historial de un estudiante para un MES específico: un
+    renglón por cada día HÁBIL (lunes a viernes) de ese mes. Si un día
+    no tiene ninguna marcación, aparece automáticamente como
+    inasistencia. No se muestran días antes de que el estudiante fuera
+    registrado, ni días futuros más allá de hoy.
+    """
     conn = None
     try:
         conn = get_conn()
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT creado_en FROM estudiantes WHERE nie = %s", (nie,))
+            fila_estudiante = cur.fetchone()
+            if fila_estudiante is None:
+                return []
+            fecha_registro = fila_estudiante["creado_en"].date()
+
             cur.execute(
                 """
                 SELECT fecha, hora_entrada, hora_salida
                 FROM asistencias
                 WHERE nie = %s
-                ORDER BY fecha DESC
+                  AND EXTRACT(YEAR FROM fecha) = %s
+                  AND EXTRACT(MONTH FROM fecha) = %s
                 """,
-                (nie,),
+                (nie, anio, mes),
             )
-            return cur.fetchall()
+            marcaciones = {fila["fecha"]: fila for fila in cur.fetchall()}
     finally:
         if conn is not None:
             conn.close()
+
+    hoy = date.today()
+    primer_dia_mes = date(anio, mes, 1)
+    ultimo_dia_mes = date(anio, mes, calendar.monthrange(anio, mes)[1])
+
+    inicio = max(primer_dia_mes, fecha_registro)
+    fin = min(ultimo_dia_mes, hoy)
+
+    historial = []
+    if inicio > fin:
+        return historial
+
+    dia = fin
+    while dia >= inicio:
+        if dia.weekday() < 5:  # 0=lunes ... 4=viernes (se saltan sábado y domingo)
+            marcacion = marcaciones.get(dia)
+            historial.append({
+                "fecha": dia,
+                "hora_entrada": marcacion["hora_entrada"] if marcacion else None,
+                "hora_salida": marcacion["hora_salida"] if marcacion else None,
+            })
+        dia -= timedelta(days=1)
+    return historial
 
 
 # ---------------------------------------------------------------------------
@@ -515,6 +558,20 @@ def admin_asistencia():
     )
 
 
+def leer_mes_de_query():
+    """Lee ?mes=YYYY-MM de la URL. Si no viene o es inválido, usa el mes actual."""
+    hoy = date.today()
+    mes_str = request.args.get("mes")
+    if mes_str:
+        try:
+            anio, mes = map(int, mes_str.split("-"))
+            date(anio, mes, 1)  # valida que sea una fecha real
+            return anio, mes
+        except (ValueError, TypeError):
+            pass
+    return hoy.year, hoy.month
+
+
 @app.route("/admin/asistencia/<nie>")
 @requiere_login
 def admin_asistencia_estudiante(nie):
@@ -524,9 +581,19 @@ def admin_asistencia_estudiante(nie):
     if not puede_administrar(estudiante):
         flash("No tienes permiso para ver la asistencia de otro salón.", "error")
         return redirect(url_for("admin_lista"))
-    historial = obtener_historial_asistencia(nie)
-    return render_template("admin_asistencia_estudiante.html", est=estudiante,
-                            historial=historial, institucion=NOMBRE_INSTITUCION)
+
+    anio, mes = leer_mes_de_query()
+    historial = obtener_historial_asistencia(nie, anio, mes)
+    hoy = date.today()
+
+    return render_template(
+        "admin_asistencia_estudiante.html",
+        est=estudiante,
+        historial=historial,
+        institucion=NOMBRE_INSTITUCION,
+        mes_seleccionado=f"{anio:04d}-{mes:02d}",
+        mes_actual=f"{hoy.year:04d}-{hoy.month:02d}",
+    )
 
 
 @app.route("/admin/asistencia/<nie>/pdf")
@@ -539,7 +606,9 @@ def admin_asistencia_estudiante_pdf(nie):
         flash("No tienes permiso para ver la asistencia de otro salón.", "error")
         return redirect(url_for("admin_lista"))
 
-    historial = obtener_historial_asistencia(nie)
+    anio, mes = leer_mes_de_query()
+    historial = obtener_historial_asistencia(nie, anio, mes)
+    nombre_mes = MESES_ES[mes]
 
     color_vino = colors.HexColor("#6E1423")
     color_pizarra = colors.HexColor("#6B7280")
@@ -568,6 +637,7 @@ def admin_asistencia_estudiante_pdf(nie):
         f"<b>Salón / Grado:</b> {estudiante['grado'] or '—'}",
         f"<b>Carrera:</b> {estudiante['carrera'] or '—'}",
         f"<b>Sección:</b> {estudiante['seccion'] or '—'}",
+        f"<b>Mes reportado:</b> {nombre_mes} {anio}",
         f"<b>Generado el:</b> {datetime.now().strftime('%d/%m/%Y %I:%M %p')}",
     ]
     for linea in info_lineas:
@@ -577,11 +647,14 @@ def admin_asistencia_estudiante_pdf(nie):
     datos_tabla = [["Fecha", "Entrada", "Salida"]]
     if historial:
         for h in historial:
-            datos_tabla.append([
-                h["fecha"].strftime("%d/%m/%Y"),
-                h["hora_entrada"].strftime("%I:%M %p") if h["hora_entrada"] else "—",
-                h["hora_salida"].strftime("%I:%M %p") if h["hora_salida"] else "—",
-            ])
+            if h["hora_entrada"] or h["hora_salida"]:
+                datos_tabla.append([
+                    h["fecha"].strftime("%d/%m/%Y"),
+                    h["hora_entrada"].strftime("%I:%M %p") if h["hora_entrada"] else "—",
+                    h["hora_salida"].strftime("%I:%M %p") if h["hora_salida"] else "—",
+                ])
+            else:
+                datos_tabla.append([h["fecha"].strftime("%d/%m/%Y"), "Inasistencia", ""])
     else:
         datos_tabla.append(["Sin marcaciones registradas todavía.", "", ""])
 
