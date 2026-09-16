@@ -1,0 +1,432 @@
+/* =========================================================
+   Portal del Estudiante — hoja de estilos propia
+   Pensado para celular primero (es donde lo van a abrir).
+   Paleta: vino institucional + dorado de los 100 años.
+   ========================================================= */
+
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  --vino: #6E1423;
+  --vino-hondo: #430B15;
+  --vino-claro: #8F2436;
+  --dorado: #C9A227;
+  --dorado-suave: #E8C55A;
+  --papel: #F7F3EA;
+  --tinta: #221A1C;
+  --gris: #7A6E70;
+  --presente: #2E7D5B;
+  --ausente: #B3452C;
+  --permiso: #B8860B;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  min-height: 100vh;
+  background: var(--papel);
+  font-family: 'Inter', -apple-system, 'Segoe UI', sans-serif;
+  color: var(--tinta);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- Encabezado con el escudo ---------- */
+.portal-cabecera {
+  background: linear-gradient(160deg, var(--vino) 0%, var(--vino-hondo) 100%);
+  color: var(--papel);
+  padding: 22px 20px 26px;
+  position: relative;
+  overflow: hidden;
+}
+.portal-cabecera::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--dorado) 0%, var(--dorado-suave) 50%, var(--dorado) 100%);
+}
+.portal-cabecera__fila {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: 560px;
+  margin: 0 auto;
+}
+.portal-cabecera__escudo {
+  width: 52px; height: 52px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: white;
+  border: 2px solid var(--dorado);
+  padding: 3px;
+  object-fit: contain;
+}
+.portal-cabecera__nombre {
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.portal-cabecera__meta {
+  font-size: 12.5px;
+  color: rgba(247,243,234,0.72);
+  margin-top: 3px;
+}
+.portal-cabecera__salir {
+  margin-left: auto;
+  color: rgba(247,243,234,0.8);
+  font-size: 12.5px;
+  text-decoration: none;
+  border: 1px solid rgba(247,243,234,0.28);
+  padding: 6px 12px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+.portal-cabecera__salir:hover { background: rgba(247,243,234,0.1); }
+
+/* ---------- Navegación entre secciones ---------- */
+.portal-nav {
+  background: white;
+  border-bottom: 1px solid #E6DECB;
+  position: sticky; top: 0; z-index: 10;
+}
+.portal-nav__interior {
+  max-width: 560px;
+  margin: 0 auto;
+  display: flex;
+}
+.portal-nav a {
+  flex: 1;
+  text-align: center;
+  padding: 14px 8px 11px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--gris);
+  text-decoration: none;
+  border-bottom: 3px solid transparent;
+}
+.portal-nav a:hover { color: var(--vino); }
+.portal-nav a[aria-current="page"] {
+  color: var(--vino);
+  border-bottom-color: var(--dorado);
+}
+
+/* ---------- Contenedor general ---------- */
+.portal-cuerpo {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 20px 18px 60px;
+}
+
+.portal-titulo {
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--vino);
+  margin-bottom: 4px;
+}
+.portal-subtitulo {
+  font-size: 13.5px;
+  color: var(--gris);
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+.portal-tarjeta {
+  background: white;
+  border: 1px solid #EBE3D2;
+  border-radius: 14px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+/* ---------- Resumen del mes (lo primero que ven) ---------- */
+.resumen {
+  background: white;
+  border: 1px solid #EBE3D2;
+  border-radius: 16px;
+  padding: 4px 0;
+  display: flex;
+  margin-bottom: 18px;
+  overflow: hidden;
+}
+.resumen__bloque {
+  flex: 1;
+  text-align: center;
+  padding: 16px 6px;
+  border-right: 1px solid #F0E9DA;
+}
+.resumen__bloque:last-child { border-right: none; }
+.resumen__numero {
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1;
+}
+.resumen__numero--presente { color: var(--presente); }
+.resumen__numero--ausente { color: var(--ausente); }
+.resumen__numero--permiso { color: var(--permiso); }
+.resumen__etiqueta {
+  font-size: 11.5px;
+  color: var(--gris);
+  margin-top: 6px;
+  line-height: 1.3;
+}
+
+/* ---------- Selector de mes ---------- */
+.mes-selector {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.mes-selector label {
+  font-size: 13px;
+  color: var(--gris);
+  font-weight: 500;
+}
+.mes-selector input {
+  flex: 1;
+  padding: 11px 13px;
+  border: 1px solid #DDD3C0;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 14.5px;
+  color: var(--tinta);
+  background: white;
+}
+
+/* ---------- Días de asistencia ---------- */
+.dias { list-style: none; }
+.dia {
+  background: white;
+  border: 1px solid #EBE3D2;
+  border-left: 4px solid #DDD3C0;
+  border-radius: 10px;
+  padding: 13px 15px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.dia--presente { border-left-color: var(--presente); }
+.dia--ausente { border-left-color: var(--ausente); }
+.dia--permiso { border-left-color: var(--permiso); }
+
+.dia__fecha {
+  font-weight: 600;
+  font-size: 14.5px;
+  min-width: 96px;
+}
+.dia__fecha small {
+  display: block;
+  font-weight: 400;
+  font-size: 11.5px;
+  color: var(--gris);
+  margin-top: 1px;
+}
+.dia__horas {
+  margin-left: auto;
+  text-align: right;
+  font-size: 13px;
+  color: var(--gris);
+  line-height: 1.5;
+}
+.dia__horas b { color: var(--tinta); font-weight: 600; }
+
+.marca {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 11px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+.marca--ausente { background: rgba(179,69,44,0.10); color: var(--ausente); }
+.marca--permiso { background: rgba(184,134,11,0.13); color: var(--permiso); }
+
+/* ---------- Formularios ---------- */
+.campo-portal { margin-bottom: 16px; }
+.campo-portal label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tinta);
+  margin-bottom: 6px;
+}
+.campo-portal .ayuda {
+  font-size: 12px;
+  color: var(--gris);
+  font-weight: 400;
+  margin-top: 5px;
+}
+.campo-portal input[type="text"],
+.campo-portal input[type="password"],
+.campo-portal input[type="date"],
+.campo-portal input[type="month"],
+.campo-portal input[type="file"],
+.campo-portal textarea {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid #DDD3C0;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 15px;
+  color: var(--tinta);
+  background: white;
+}
+.campo-portal textarea { resize: vertical; min-height: 78px; }
+.campo-portal input:focus-visible,
+.campo-portal textarea:focus-visible,
+.mes-selector input:focus-visible,
+.portal-nav a:focus-visible,
+.boton-portal:focus-visible {
+  outline: 3px solid var(--dorado);
+  outline-offset: 2px;
+}
+
+.rango-fechas { display: flex; gap: 12px; }
+.rango-fechas > * { flex: 1; }
+
+.boton-portal {
+  width: 100%;
+  background: var(--vino);
+  color: white;
+  border: none;
+  padding: 14px;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.boton-portal:hover { background: var(--vino-hondo); }
+.boton-portal:disabled { opacity: 0.6; cursor: default; }
+
+/* ---------- Avisos ---------- */
+.aviso {
+  padding: 13px 15px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+.aviso--exito { background: rgba(46,125,91,0.10); color: var(--presente); }
+.aviso--error { background: rgba(179,69,44,0.10); color: var(--ausente); }
+.aviso--aviso { background: rgba(201,162,39,0.14); color: #8A6D14; }
+
+.vacio {
+  text-align: center;
+  color: var(--gris);
+  font-size: 13.5px;
+  padding: 34px 20px;
+  line-height: 1.6;
+}
+
+/* ---------- Constancias subidas ---------- */
+.constancia {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 12px 0;
+  border-bottom: 1px solid #F0E9DA;
+}
+.constancia:last-child { border-bottom: none; }
+.constancia__mini {
+  width: 46px; height: 46px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 1px solid #E6DECB;
+  flex-shrink: 0;
+}
+.constancia__fecha { font-weight: 600; font-size: 14px; }
+.constancia__nota { font-size: 12.5px; color: var(--gris); margin-top: 2px; }
+.constancia__ver {
+  margin-left: auto;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--vino);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.constancia__ver:hover { text-decoration: underline; }
+
+/* ---------- Pantalla de inicio de sesión ---------- */
+.acceso {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 18px;
+  background: linear-gradient(165deg, var(--vino) 0%, var(--vino-hondo) 100%);
+}
+.acceso__caja {
+  width: 100%;
+  max-width: 360px;
+  background: white;
+  border-radius: 18px;
+  padding: 32px 26px 28px;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.28);
+  text-align: center;
+}
+.acceso__escudo {
+  width: 84px; height: 84px;
+  border-radius: 50%;
+  border: 3px solid var(--dorado);
+  padding: 5px;
+  background: white;
+  object-fit: contain;
+  margin-bottom: 16px;
+}
+.acceso__titulo {
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 21px;
+  font-weight: 600;
+  color: var(--vino);
+  margin-bottom: 4px;
+}
+.acceso__institucion {
+  font-size: 12.5px;
+  color: var(--gris);
+  margin-bottom: 24px;
+  line-height: 1.45;
+}
+.acceso .campo-portal { text-align: left; }
+.acceso__pie {
+  margin-top: 20px;
+  font-size: 12px;
+  color: var(--gris);
+  line-height: 1.5;
+}
+
+/* ---------- Accesos del inicio ---------- */
+.acceso-rapido {
+  display: block;
+  background: white;
+  border: 1px solid #EBE3D2;
+  border-radius: 14px;
+  padding: 18px 20px;
+  margin-bottom: 12px;
+  text-decoration: none;
+  color: inherit;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+.acceso-rapido:hover { border-color: var(--dorado); }
+.acceso-rapido__icono {
+  width: 42px; height: 42px;
+  border-radius: 11px;
+  background: rgba(110,20,35,0.07);
+  color: var(--vino);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.acceso-rapido__titulo { font-weight: 600; font-size: 15px; }
+.acceso-rapido__desc { font-size: 12.5px; color: var(--gris); margin-top: 2px; line-height: 1.4; }
+
+@media (min-width: 640px) {
+  .portal-cabecera { padding: 26px 20px 30px; }
+  .portal-cabecera__nombre { font-size: 22px; }
+}

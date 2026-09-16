@@ -1,0 +1,55 @@
+{% extends "portal_base.html" %}
+{% set seccion = 'permiso' %}
+{% block titulo %}Permisos · Portal del Estudiante{% endblock %}
+
+{% block contenido %}
+  <h1 class="portal-titulo">Subir una constancia</h1>
+  <p class="portal-subtitulo">Toma una foto de tu constancia y elige los días que cubre. Tus maestros la verán marcada como falta con permiso.</p>
+
+  <div class="portal-tarjeta">
+    <form method="post" enctype="multipart/form-data">
+      <div class="campo-portal">
+        <label>¿Qué días faltaste?</label>
+        <div class="rango-fechas">
+          <input type="date" name="fecha_inicio" max="{{ hoy.isoformat() }}" required aria-label="Primer día">
+          <input type="date" name="fecha_fin" max="{{ hoy.isoformat() }}" required aria-label="Último día">
+        </div>
+        <div class="ayuda">Si faltaste un solo día, pon la misma fecha en los dos.</div>
+      </div>
+
+      <div class="campo-portal">
+        <label for="imagen">Foto de la constancia</label>
+        <input type="file" id="imagen" name="imagen" accept="image/*" capture="environment" required>
+        <div class="ayuda">Desde el celular puedes tomarle la foto en el momento.</div>
+      </div>
+
+      <div class="campo-portal">
+        <label for="comentario">Motivo (opcional)</label>
+        <textarea id="comentario" name="comentario" placeholder="Ejemplo: cita médica"></textarea>
+      </div>
+
+      <button type="submit" class="boton-portal">Subir constancia</button>
+    </form>
+  </div>
+
+  <h2 class="portal-titulo" style="font-size:17px; margin-top:26px;">Constancias que has subido</h2>
+
+  <div class="portal-tarjeta">
+    {% if permisos %}
+      {% for p in permisos %}
+        <div class="constancia">
+          <img class="constancia__mini"
+               src="{{ url_for('permiso_imagen', nie=nie, fecha_str=p.fecha.isoformat()) }}" alt="">
+          <div>
+            <div class="constancia__fecha">{{ p.fecha.strftime('%d/%m/%Y') }}</div>
+            {% if p.comentario %}<div class="constancia__nota">{{ p.comentario }}</div>{% endif %}
+          </div>
+          <a class="constancia__ver" target="_blank"
+             href="{{ url_for('permiso_imagen', nie=nie, fecha_str=p.fecha.isoformat()) }}">Ver</a>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="vacio">Todavía no has subido ninguna constancia.</div>
+    {% endif %}
+  </div>
+{% endblock %}

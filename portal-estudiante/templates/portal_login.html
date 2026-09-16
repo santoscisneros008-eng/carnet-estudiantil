@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Entrar · Portal del Estudiante</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/portal.css') }}">
+</head>
+<body>
+  <div class="acceso">
+    <div class="acceso__caja">
+      <img class="acceso__escudo" src="{{ url_for('static', filename='img/logo-100-anos.png') }}" alt="">
+      <h1 class="acceso__titulo">Portal del Estudiante</h1>
+      <p class="acceso__institucion">{{ institucion }}</p>
+
+      {% if error %}
+        <div class="aviso aviso--error">{{ error }}</div>
+      {% endif %}
+
+      <form method="post">
+        <div class="campo-portal">
+          <label for="nie">Tu NIE</label>
+          <input type="text" id="nie" name="nie" autocomplete="username" required autofocus
+                 inputmode="numeric" placeholder="El número de tu carné">
+        </div>
+        <div class="campo-portal">
+          <label for="password">Contraseña</label>
+          <input type="password" id="password" name="password" autocomplete="current-password" required>
+        </div>
+        <button type="submit" class="boton-portal">Entrar</button>
+      </form>
+
+      <p class="acceso__pie">
+        ¿No tienes contraseña todavía? Pídesela a Dirección.
+      </p>
+    </div>
+  </div>
+</body>
+</html>

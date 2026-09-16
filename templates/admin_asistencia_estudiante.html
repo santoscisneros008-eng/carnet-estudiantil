@@ -48,6 +48,12 @@
             {% if h.hora_entrada or h.hora_salida %}
             <td>{{ h.hora_entrada.strftime('%I:%M %p') if h.hora_entrada else '—' }}</td>
             <td>{{ h.hora_salida.strftime('%I:%M %p') if h.hora_salida else '—' }}</td>
+            {% elif h.tiene_permiso %}
+            <td colspan="2" style="text-align:center; color:#B8860B; font-weight:600;">
+              Inasistencia con permiso
+              <a href="{{ url_for('permiso_imagen', nie=est.nie, fecha_str=h.fecha.isoformat()) }}"
+                 target="_blank" style="font-weight:500; margin-left:6px;">(ver constancia)</a>
+            </td>
             {% else %}
             <td colspan="2" style="text-align:center; color:var(--alerta); font-weight:600;">Inasistencia</td>
             {% endif %}
