@@ -1,0 +1,1073 @@
+"""
+Carné Digital de Estudiantes
+=============================
+Aplicación Flask que consulta un estudiante por su NIE en una base de
+datos PostgreSQL (Aiven) y renderiza su carné digital.
+
+Panel de administración con 2 roles:
+  - DIRECTOR: ve y administra todos los salones (agrupados por salón).
+  - PROFESOR: solo ve su propio salón; no puede agregar ni eliminar
+    estudiantes (solo Dirección puede).
+
+Al abrir el carné (QR, NFC, o entrada manual) se registra automática-
+mente la hora de entrada o salida, según la hora del día.
+
+El QR de cada estudiante se genera al vuelo en /qr/<nie>.png — no se
+guardan archivos en el servidor (importante para Render, cuyo disco no
+es persistente entre despliegues).
+"""
+
+import os
+import calendar
+from datetime import date, datetime, timedelta
+from functools import wraps
+from io import BytesIO
+
+import qrcode
+from flask import Flask, flash, redirect, render_template, request, send_file, session, url_for
+from PIL import Image
+from werkzeug.middleware.proxy_fix import ProxyFix
+
+import psycopg2
+import psycopg2.extras
+from dotenv import load_dotenv
+from werkzeug.security import check_password_hash, generate_password_hash
+
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.lib.units import cm
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+from qr_utils import get_local_ip
+
+load_dotenv()
+
+app = Flask(__name__)
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "cambia-esta-clave-en-produccion")
+# Permite que Flask detecte correctamente el dominio real (https, host)
+# cuando corre detrás del proxy de Render.
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+
+NOMBRE_INSTITUCION = os.getenv("NOMBRE_INSTITUCION", "Institución Educativa")
+
+# Hora (0-23) que separa "entrada" de "salida" al abrir el carné.
+HORA_CORTE_ASISTENCIA = int(os.getenv("HORA_CORTE_ASISTENCIA", "12"))
+
+ESTADOS_VALIDOS = ("ACTIVO", "INACTIVO", "GRADUADO")
+
+MESES_ES = [
+    "", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+    "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+]
+
+# Índice 0 = lunes, igual que date.weekday()
+DIAS_SEMANA_ES = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+
+
+def get_conn():
+    return psycopg2.connect(
+        host=os.getenv("PGHOST"),
+        port=os.getenv("PGPORT", "5432"),
+        dbname=os.getenv("PGDATABASE"),
+        user=os.getenv("PGUSER"),
+        password=os.getenv("PGPASSWORD"),
+        sslmode=os.getenv("PGSSLMODE", "require"),
+        connect_timeout=8,
+    )
+
+
+def _norm(txt):
+    """Normaliza texto para comparar salones sin importar mayúsculas/espacios."""
+    return (txt or "").strip().lower()
+
+
+def procesar_foto(archivo):
+    """
+    Redimensiona y comprime la foto subida a un tamaño razonable para un
+    carné (máx. 500x500, JPEG). Devuelve (bytes, mimetype) o (None, None)
+    si no se subió ninguna foto o el archivo no es una imagen válida.
+    """
+    if not archivo or not archivo.filename:
+        return None, None
+    try:
+        img = Image.open(archivo.stream)
+        img = img.convert("RGB")
+        img.thumbnail((500, 500))
+        buffer = BytesIO()
+        img.save(buffer, format="JPEG", quality=85)
+        return buffer.getvalue(), "image/jpeg"
+    except Exception:
+        return None, None
+
+
+# ---------------------------------------------------------------------------
+# Estudiantes
+# ---------------------------------------------------------------------------
+
+def obtener_estudiante_por_nie(nie: str):
+    conn = None
+    try:
+        conn = get_conn()
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT nie, nombres, apellidos, carrera, seccion, grado,
+                       correo, telefono, estado, fecha_nacimiento,
+                       (foto IS NOT NULL) AS tiene_foto
+                FROM estudiantes
+                WHERE nie = %s
+                """,
+                (nie,),
+            )
+            return cur.fetchone()
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+def obtener_foto(nie: str):
+    """Devuelve (bytes, mimetype) de la foto de un estudiante, o (None, None)."""
+    conn = None
+    try:
+        conn = get_conn()
+        with conn.cursor() as cur:
+            cur.execute("SELECT foto, foto_tipo FROM estudiantes WHERE nie = %s", (nie,))
+            fila = cur.fetchone()
+            if fila is None or fila[0] is None:
+                return None, None
+            return bytes(fila[0]), fila[1]
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+def listar_estudiantes(grado: str = None):
+    """Si `grado` viene dado, filtra solo ese salón. Si es None, devuelve
+    todos, ordenados por salón (para poder agruparlos en pantalla)."""
+    conn = None
+    try:
+        conn = get_conn()
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            if grado:
+                cur.execute(
+                    """
+                    SELECT nie, nombres, apellidos, carrera, seccion, grado, estado
+                    FROM estudiantes
+                    WHERE LOWER(TRIM(grado)) = LOWER(TRIM(%s))
+                    ORDER BY nombres, apellidos
+                    """,
+                    (grado,),
+                )
+            else:
+                cur.execute(
+                    """
+                    SELECT nie, nombres, apellidos, carrera, seccion, grado, estado
+                    FROM estudiantes
+                    ORDER BY grado NULLS LAST, nombres, apellidos
+                    """
+                )
+            return cur.fetchall()
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+def obtener_grados_distintos():
+    conn = None
+    try:
+        conn = get_conn()
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT DISTINCT grado FROM estudiantes WHERE grado IS NOT NULL AND grado <> '' ORDER BY grado"
+            )
+            return [fila[0] for fila in cur.fetchall()]
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+def agrupar_por_grado(filas):
+    grupos = {}
+    for fila in filas:
+        clave = fila.get("grado") or "Sin salón asignado"
+        grupos.setdefault(clave, []).append(fila)
+    return grupos
+
+
+def crear_estudiante(datos: dict, foto_bytes=None, foto_tipo=None):
+    conn = None
+    try:
+        conn = get_conn()
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO estudiantes
+                    (nie, nombres, apellidos, carrera, seccion, grado,
+                     correo, telefono, estado, fecha_nacimiento, foto, foto_tipo)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    datos["nie"],
+                    datos["nombres"],
+                    datos["apellidos"],
+                    datos["carrera"] or None,
+                    datos["seccion"] or None,
+                    datos["grado"] or None,
+                    datos["correo"] or None,
+                    datos["telefono"] or None,
+                    datos["estado"],
+                    datos["fecha_nacimiento"] or None,
+                    psycopg2.Binary(foto_bytes) if foto_bytes else None,
+                    foto_tipo,
+                ),
+            )
+        conn.commit()
+        return True, None
+    except psycopg2.errors.UniqueViolation:
+        conn.rollback()
+        return False, f"Ya existe un estudiante registrado con el NIE '{datos['nie']}'."
+    except Exception as e:
+        if conn is not None:
+            conn.rollback()
+        return False, f"Ocurrió un error al guardar: {e}"
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+def eliminar_estudiante(nie: str) -> bool:
+    conn = None
+    try:
+        conn = get_conn()
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM estudiantes WHERE nie = %s", (nie,))
+            filas_borradas = cur.rowcount
+        conn.commit()
+        return filas_borradas > 0
+    except Exception:
+        if conn is not None:
+            conn.rollback()
+        return False
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+# ---------------------------------------------------------------------------
+# Asistencia
+# ---------------------------------------------------------------------------
+
+def registrar_asistencia(nie: str):
+    ahora = datetime.now()
+    hoy = ahora.date()
+    es_manana = ahora.hour < HORA_CORTE_ASISTENCIA
+    conn = None
+    try:
+        conn = get_conn()
+        with conn.cursor() as cur:
+            if es_manana:
+                cur.execute(
+                    """
+                    INSERT INTO asistencias (nie, fecha, hora_entrada)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (nie, fecha)
+                    DO UPDATE SET hora_entrada = COALESCE(asistencias.hora_entrada, EXCLUDED.hora_entrada)
+                    """,
+                    (nie, hoy, ahora.time()),
+                )
+            else:
+                cur.execute(
+                    """
+                    INSERT INTO asistencias (nie, fecha, hora_salida)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (nie, fecha)
+                    DO UPDATE SET hora_salida = COALESCE(asistencias.hora_salida, EXCLUDED.hora_salida)
+                    """,
+                    (nie, hoy, ahora.time()),
+                )
+        conn.commit()
+    except Exception:
+        if conn is not None:
+            conn.rollback()
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+def listar_asistencia_por_fecha(fecha, grado: str = None):
+    conn = None
+    try:
+        conn = get_conn()
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            consulta = """
+                SELECT e.nie, e.nombres, e.apellidos, e.estado, e.grado,
+                       a.hora_entrada, a.hora_salida,
+                       (p.nie IS NOT NULL) AS tiene_permiso
+                FROM estudiantes e
+                LEFT JOIN asistencias a
+                    ON a.nie = e.nie AND a.fecha = %s
+                LEFT JOIN permisos p
+                    ON p.nie = e.nie AND p.fecha = %s
+            """
+            parametros = [fecha, fecha]
+            if grado:
+                consulta += " WHERE LOWER(TRIM(e.grado)) = LOWER(TRIM(%s))"
+                parametros.append(grado)
+            consulta += " ORDER BY e.grado NULLS LAST, e.nombres, e.apellidos"
+            cur.execute(consulta, parametros)
+            return cur.fetchall()
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+def obtener_historial_asistencia(nie: str, anio: int, mes: int):
+    """
+    Devuelve el historial de un estudiante para un MES específico: un
+    renglón por cada día HÁBIL (lunes a viernes) de ese mes. Si un día
+    no tiene ninguna marcación, aparece automáticamente como
+    inasistencia. No se muestran días antes de que el estudiante fuera
+    registrado, ni días futuros más allá de hoy.
+    """
+    conn = None
+    try:
+        conn = get_conn()
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT creado_en FROM estudiantes WHERE nie = %s", (nie,))
+            fila_estudiante = cur.fetchone()
+            if fila_estudiante is None:
+                return []
+            fecha_registro = fila_estudiante["creado_en"].date()
+
+            cur.execute(
+                """
+                SELECT fecha, hora_entrada, hora_salida
+                FROM asistencias
+                WHERE nie = %s
+                  AND EXTRACT(YEAR FROM fecha) = %s
+                  AND EXTRACT(MONTH FROM fecha) = %s
+                """,
+                (nie, anio, mes),
+            )
+            marcaciones = {fila["fecha"]: fila for fila in cur.fetchall()}
+
+            cur.execute(
+                """
+                SELECT fecha FROM permisos
+                WHERE nie = %s
+                  AND EXTRACT(YEAR FROM fecha) = %s
+                  AND EXTRACT(MONTH FROM fecha) = %s
+                """,
+                (nie, anio, mes),
+            )
+            fechas_con_permiso = {fila["fecha"] for fila in cur.fetchall()}
+    finally:
+        if conn is not None:
+            conn.close()
+
+    hoy = date.today()
+    primer_dia_mes = date(anio, mes, 1)
+    ultimo_dia_mes = date(anio, mes, calendar.monthrange(anio, mes)[1])
+
+    inicio = max(primer_dia_mes, fecha_registro)
+    fin = min(ultimo_dia_mes, hoy)
+
+    historial = []
+    if inicio > fin:
+        return historial
+
+    dia = fin
+    while dia >= inicio:
+        if dia.weekday() < 5:  # 0=lunes ... 4=viernes (se saltan sábado y domingo)
+            marcacion = marcaciones.get(dia)
+            historial.append({
+                "fecha": dia,
+                "hora_entrada": marcacion["hora_entrada"] if marcacion else None,
+                "hora_salida": marcacion["hora_salida"] if marcacion else None,
+                "tiene_permiso": dia in fechas_con_permiso,
+            })
+        dia -= timedelta(days=1)
+    return historial
+
+
+# ---------------------------------------------------------------------------
+# Permisos de inasistencia (constancias subidas por el estudiante)
+# ---------------------------------------------------------------------------
+
+def guardar_permiso(nie: str, fecha, imagen_bytes: bytes, imagen_tipo: str, comentario: str):
+    conn = None
+    try:
+        conn = get_conn()
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO permisos (nie, fecha, imagen, imagen_tipo, comentario)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (nie, fecha)
+                DO UPDATE SET imagen = EXCLUDED.imagen, imagen_tipo = EXCLUDED.imagen_tipo,
+                              comentario = EXCLUDED.comentario, subido_en = NOW()
+                """,
+                (nie, fecha, psycopg2.Binary(imagen_bytes), imagen_tipo, comentario or None),
+            )
+        conn.commit()
+        return True, None
+    except Exception as e:
+        if conn is not None:
+            conn.rollback()
+        return False, f"Ocurrió un error al guardar la constancia: {e}"
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+def listar_permisos(nie: str):
+    conn = None
+    try:
+        conn = get_conn()
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                "SELECT fecha, comentario, subido_en FROM permisos WHERE nie = %s ORDER BY fecha DESC",
+                (nie,),
+            )
+            return cur.fetchall()
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+def obtener_imagen_permiso(nie: str, fecha):
+    conn = None
+    try:
+        conn = get_conn()
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT imagen, imagen_tipo FROM permisos WHERE nie = %s AND fecha = %s",
+                (nie, fecha),
+            )
+            fila = cur.fetchone()
+            if fila is None:
+                return None, None
+            return bytes(fila[0]), fila[1]
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+def procesar_imagen_permiso(archivo):
+    """Redimensiona/comprime la foto de la constancia (máx. 1200px de lado
+    más largo, JPEG) — más grande que la foto de perfil porque debe leerse
+    el texto del documento."""
+    if not archivo or not archivo.filename:
+        return None, None
+    try:
+        img = Image.open(archivo.stream)
+        img = img.convert("RGB")
+        img.thumbnail((1200, 1200))
+        buffer = BytesIO()
+        img.save(buffer, format="JPEG", quality=88)
+        return buffer.getvalue(), "image/jpeg"
+    except Exception:
+        return None, None
+
+
+# ---------------------------------------------------------------------------
+# Cuentas de administración (director / profesor por salón)
+# ---------------------------------------------------------------------------
+
+def obtener_admin(usuario: str):
+    conn = None
+    try:
+        conn = get_conn()
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                "SELECT usuario, password_hash, rol, grado FROM admins WHERE usuario = %s",
+                (usuario,),
+            )
+            return cur.fetchone()
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+def es_director() -> bool:
+    return session.get("admin_rol") == "director"
+
+
+def grado_sesion():
+    return session.get("admin_grado")
+
+
+def puede_administrar(estudiante) -> bool:
+    if es_director():
+        return True
+    return _norm(estudiante.get("grado")) == _norm(grado_sesion())
+
+
+def requiere_login(vista):
+    @wraps(vista)
+    def envoltura(*args, **kwargs):
+        if not session.get("admin_usuario"):
+            return redirect(url_for("admin_login", siguiente=request.path))
+        return vista(*args, **kwargs)
+    return envoltura
+
+
+def requiere_director(vista):
+    """Solo la cuenta de Dirección puede pasar (agregar/eliminar estudiantes)."""
+    @wraps(vista)
+    def envoltura(*args, **kwargs):
+        if not es_director():
+            flash("Esa acción solo está disponible para la cuenta de Dirección.", "error")
+            return redirect(url_for("admin_lista"))
+        return vista(*args, **kwargs)
+    return envoltura
+
+
+# ---------------------------------------------------------------------------
+# Portal del estudiante (login propio, con su NIE como usuario)
+# ---------------------------------------------------------------------------
+
+def asignar_password_estudiante(nie: str, password: str) -> bool:
+    conn = None
+    try:
+        conn = get_conn()
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE estudiantes SET password_hash = %s WHERE nie = %s",
+                (generate_password_hash(password), nie),
+            )
+            filas = cur.rowcount
+        conn.commit()
+        return filas > 0
+    except Exception:
+        if conn is not None:
+            conn.rollback()
+        return False
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+def verificar_login_estudiante(nie: str, password: str):
+    """Devuelve el estudiante si el NIE y la contraseña son correctos, si no None."""
+    conn = None
+    try:
+        conn = get_conn()
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                "SELECT nie, nombres, apellidos, password_hash FROM estudiantes WHERE nie = %s",
+                (nie,),
+            )
+            fila = cur.fetchone()
+            if fila is None or not fila["password_hash"]:
+                return None
+            if not check_password_hash(fila["password_hash"], password):
+                return None
+            return fila
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+def requiere_estudiante(vista):
+    @wraps(vista)
+    def envoltura(*args, **kwargs):
+        if not session.get("estudiante_nie"):
+            return redirect(url_for("portal_login", siguiente=request.path))
+        return vista(*args, **kwargs)
+    return envoltura
+
+
+@app.context_processor
+def inyectar_foto_del_portal():
+    """Disponible en cualquier plantilla: True si el estudiante logueado
+    tiene foto de perfil, para mostrarla en el encabezado del portal
+    (o las iniciales de respaldo si no tiene)."""
+    nie = session.get("estudiante_nie")
+    if not nie:
+        return {}
+    conn = None
+    try:
+        conn = get_conn()
+        with conn.cursor() as cur:
+            cur.execute("SELECT foto IS NOT NULL FROM estudiantes WHERE nie = %s", (nie,))
+            fila = cur.fetchone()
+            return {"tiene_foto": bool(fila and fila[0])}
+    except Exception:
+        return {"tiene_foto": False}
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+@app.route("/admin/login", methods=["GET", "POST"])
+def admin_login():
+    error = None
+    if request.method == "POST":
+        usuario = request.form.get("usuario", "").strip()
+        password = request.form.get("password", "")
+        admin = obtener_admin(usuario)
+        if admin and check_password_hash(admin["password_hash"], password):
+            session["admin_usuario"] = admin["usuario"]
+            session["admin_rol"] = admin["rol"]
+            session["admin_grado"] = admin["grado"]
+            siguiente = request.args.get("siguiente") or url_for("admin_lista")
+            return redirect(siguiente)
+        error = "Usuario o contraseña incorrectos."
+    return render_template("admin_login.html", institucion=NOMBRE_INSTITUCION, error=error)
+
+
+@app.route("/admin/logout")
+def admin_logout():
+    session.clear()
+    return redirect(url_for("admin_login"))
+
+
+# ---------------------------------------------------------------------------
+# Portal del estudiante
+# ---------------------------------------------------------------------------
+
+@app.route("/portal/login", methods=["GET", "POST"])
+def portal_login():
+    error = None
+    if request.method == "POST":
+        nie = request.form.get("nie", "").strip()
+        password = request.form.get("password", "")
+        estudiante = verificar_login_estudiante(nie, password)
+        if estudiante:
+            session["estudiante_nie"] = estudiante["nie"]
+            session["estudiante_nombre"] = f"{estudiante['nombres']} {estudiante['apellidos']}"
+            siguiente = request.args.get("siguiente") or url_for("portal_inicio")
+            return redirect(siguiente)
+        error = "NIE o contraseña incorrectos."
+    return render_template("portal_login.html", institucion=NOMBRE_INSTITUCION, error=error)
+
+
+@app.route("/portal/logout")
+def portal_logout():
+    session.pop("estudiante_nie", None)
+    session.pop("estudiante_nombre", None)
+    return redirect(url_for("portal_login"))
+
+
+@app.route("/portal")
+@requiere_estudiante
+def portal_inicio():
+    return render_template(
+        "portal_inicio.html",
+        institucion=NOMBRE_INSTITUCION,
+        nombre=session.get("estudiante_nombre"),
+        nie=session.get("estudiante_nie"),
+    )
+
+
+@app.route("/portal/asistencia")
+@requiere_estudiante
+def portal_asistencia():
+    nie = session["estudiante_nie"]
+    anio, mes = leer_mes_de_query()
+    historial = obtener_historial_asistencia(nie, anio, mes)
+    hoy = date.today()
+    return render_template(
+        "portal_asistencia.html",
+        institucion=NOMBRE_INSTITUCION,
+        nombre=session.get("estudiante_nombre"),
+        nie=nie,
+        historial=historial,
+        dias_semana=DIAS_SEMANA_ES,
+        mes_seleccionado=f"{anio:04d}-{mes:02d}",
+        mes_actual=f"{hoy.year:04d}-{hoy.month:02d}",
+    )
+
+
+@app.route("/portal/permiso", methods=["GET", "POST"])
+@requiere_estudiante
+def portal_permiso():
+    nie = session["estudiante_nie"]
+
+    if request.method == "POST":
+        inicio_str = request.form.get("fecha_inicio", "").strip()
+        fin_str = request.form.get("fecha_fin", "").strip()
+        comentario = request.form.get("comentario", "").strip()
+        try:
+            fecha_inicio = datetime.strptime(inicio_str, "%Y-%m-%d").date()
+            fecha_fin = datetime.strptime(fin_str, "%Y-%m-%d").date()
+        except ValueError:
+            flash("Indica un rango de fechas válido.", "error")
+            return redirect(url_for("portal_permiso"))
+
+        if fecha_fin < fecha_inicio:
+            flash("La fecha final no puede ser antes que la fecha de inicio.", "error")
+            return redirect(url_for("portal_permiso"))
+
+        if fecha_inicio > date.today():
+            flash("No puedes subir una constancia para fechas futuras.", "error")
+            return redirect(url_for("portal_permiso"))
+
+        # Si el rango incluye días futuros, lo recortamos a hoy — no se
+        # puede excusar un día que todavía no ha pasado.
+        fecha_fin = min(fecha_fin, date.today())
+
+        if (fecha_fin - fecha_inicio).days > 30:
+            flash("El rango no puede ser mayor a 30 días.", "error")
+            return redirect(url_for("portal_permiso"))
+
+        imagen_bytes, imagen_tipo = procesar_imagen_permiso(request.files.get("imagen"))
+        if imagen_bytes is None:
+            flash("Debes adjuntar una foto o imagen de la constancia.", "error")
+            return redirect(url_for("portal_permiso"))
+
+        dias_guardados = 0
+        dia = fecha_inicio
+        while dia <= fecha_fin:
+            if dia.weekday() < 5:  # solo días hábiles, igual que la asistencia
+                ok, error = guardar_permiso(nie, dia, imagen_bytes, imagen_tipo, comentario)
+                if ok:
+                    dias_guardados += 1
+            dia += timedelta(days=1)
+
+        if dias_guardados:
+            if fecha_inicio == fecha_fin:
+                flash(f"Constancia del {fecha_inicio.strftime('%d/%m/%Y')} subida correctamente.", "exito")
+            else:
+                flash(
+                    f"Constancia subida para {dias_guardados} día(s), "
+                    f"del {fecha_inicio.strftime('%d/%m/%Y')} al {fecha_fin.strftime('%d/%m/%Y')}.",
+                    "exito",
+                )
+        else:
+            flash("El rango elegido no tenía ningún día hábil por marcar.", "error")
+        return redirect(url_for("portal_permiso"))
+
+    permisos = listar_permisos(nie)
+    return render_template(
+        "portal_permiso.html",
+        institucion=NOMBRE_INSTITUCION,
+        nombre=session.get("estudiante_nombre"),
+        nie=nie,
+        permisos=permisos,
+        hoy=date.today(),
+    )
+
+
+@app.route("/permiso-imagen/<nie>/<fecha_str>")
+def permiso_imagen(nie, fecha_str):
+    """Sirve la foto de una constancia. La ve el propio estudiante dueño,
+    o un admin (profesor de su salón / Dirección) — nadie más."""
+    try:
+        fecha = datetime.strptime(fecha_str, "%Y-%m-%d").date()
+    except ValueError:
+        return "", 404
+
+    autorizado = session.get("estudiante_nie") == nie
+    if not autorizado and session.get("admin_usuario"):
+        estudiante = obtener_estudiante_por_nie(nie)
+        autorizado = bool(estudiante) and puede_administrar(estudiante)
+
+    if not autorizado:
+        return "", 403
+
+    imagen_bytes, imagen_tipo = obtener_imagen_permiso(nie, fecha)
+    if imagen_bytes is None:
+        return "", 404
+    return send_file(BytesIO(imagen_bytes), mimetype=imagen_tipo or "image/jpeg")
+
+
+# ---------------------------------------------------------------------------
+# Panel de administración
+# ---------------------------------------------------------------------------
+
+@app.route("/admin")
+@requiere_login
+def admin_lista():
+    grado_filtro = (request.args.get("grado") or None) if es_director() else grado_sesion()
+    estudiantes = listar_estudiantes(grado_filtro)
+    grupos = agrupar_por_grado(estudiantes)
+
+    return render_template(
+        "admin_lista.html",
+        grupos=grupos,
+        institucion=NOMBRE_INSTITUCION,
+        es_director=es_director(),
+        grado_sesion=grado_sesion(),
+        grado_filtro=grado_filtro,
+        grados_existentes=obtener_grados_distintos() if es_director() else [],
+    )
+
+
+@app.route("/admin/nuevo", methods=["GET", "POST"])
+@requiere_login
+@requiere_director
+def admin_nuevo():
+    # Solo Dirección llega aquí, así que siempre se elige el salón libremente.
+    grados_existentes = obtener_grados_distintos()
+
+    if request.method == "POST":
+        datos = {
+            "nie": request.form.get("nie", "").strip(),
+            "nombres": request.form.get("nombres", "").strip(),
+            "apellidos": request.form.get("apellidos", "").strip(),
+            "carrera": request.form.get("carrera", "").strip(),
+            "seccion": request.form.get("seccion", "").strip(),
+            "grado": request.form.get("grado", "").strip(),
+            "correo": request.form.get("correo", "").strip(),
+            "telefono": request.form.get("telefono", "").strip(),
+            "estado": request.form.get("estado", "ACTIVO"),
+            "fecha_nacimiento": request.form.get("fecha_nacimiento", "").strip(),
+        }
+
+        if not datos["nie"] or not datos["nombres"] or not datos["apellidos"]:
+            flash("NIE, nombres y apellidos son obligatorios.", "error")
+            return render_template("admin_nuevo.html", institucion=NOMBRE_INSTITUCION,
+                                    datos=datos, grados_existentes=grados_existentes)
+
+        if not datos["grado"]:
+            flash("Debes indicar el grado/salón del estudiante.", "error")
+            return render_template("admin_nuevo.html", institucion=NOMBRE_INSTITUCION,
+                                    datos=datos, grados_existentes=grados_existentes)
+
+        if datos["estado"] not in ESTADOS_VALIDOS:
+            datos["estado"] = "ACTIVO"
+
+        foto_bytes, foto_tipo = procesar_foto(request.files.get("foto"))
+
+        ok, error = crear_estudiante(datos, foto_bytes, foto_tipo)
+        if not ok:
+            flash(error, "error")
+            return render_template("admin_nuevo.html", institucion=NOMBRE_INSTITUCION,
+                                    datos=datos, grados_existentes=grados_existentes)
+
+        flash(f"Estudiante '{datos['nombres']} {datos['apellidos']}' agregado correctamente.", "exito")
+        return redirect(url_for("admin_lista"))
+
+    return render_template("admin_nuevo.html", institucion=NOMBRE_INSTITUCION,
+                            datos={}, grados_existentes=grados_existentes)
+
+
+@app.route("/admin/eliminar/<nie>", methods=["POST"])
+@requiere_login
+@requiere_director
+def admin_eliminar(nie):
+    borrado = eliminar_estudiante(nie)
+    if borrado:
+        flash(f"Estudiante con NIE '{nie}' eliminado.", "exito")
+    else:
+        flash(f"No se encontró ningún estudiante con NIE '{nie}'.", "error")
+    return redirect(url_for("admin_lista"))
+
+
+@app.route("/admin/asistencia")
+@requiere_login
+def admin_asistencia():
+    fecha_str = request.args.get("fecha")
+    try:
+        fecha = datetime.strptime(fecha_str, "%Y-%m-%d").date() if fecha_str else date.today()
+    except ValueError:
+        fecha = date.today()
+
+    grado_filtro = (request.args.get("grado") or None) if es_director() else grado_sesion()
+
+    registros = listar_asistencia_por_fecha(fecha, grado_filtro)
+    grupos = agrupar_por_grado(registros)
+
+    return render_template(
+        "admin_asistencia.html",
+        grupos=grupos,
+        fecha=fecha,
+        hoy=date.today(),
+        institucion=NOMBRE_INSTITUCION,
+        es_director=es_director(),
+        grado_filtro=grado_filtro,
+        grados_existentes=obtener_grados_distintos() if es_director() else [],
+    )
+
+
+def leer_mes_de_query():
+    """Lee ?mes=YYYY-MM de la URL. Si no viene o es inválido, usa el mes actual."""
+    hoy = date.today()
+    mes_str = request.args.get("mes")
+    if mes_str:
+        try:
+            anio, mes = map(int, mes_str.split("-"))
+            date(anio, mes, 1)  # valida que sea una fecha real
+            return anio, mes
+        except (ValueError, TypeError):
+            pass
+    return hoy.year, hoy.month
+
+
+@app.route("/admin/asistencia/<nie>")
+@requiere_login
+def admin_asistencia_estudiante(nie):
+    estudiante = obtener_estudiante_por_nie(nie)
+    if estudiante is None:
+        return render_template("error.html", nie=nie, institucion=NOMBRE_INSTITUCION), 404
+    if not puede_administrar(estudiante):
+        flash("No tienes permiso para ver la asistencia de otro salón.", "error")
+        return redirect(url_for("admin_lista"))
+
+    anio, mes = leer_mes_de_query()
+    historial = obtener_historial_asistencia(nie, anio, mes)
+    hoy = date.today()
+
+    return render_template(
+        "admin_asistencia_estudiante.html",
+        est=estudiante,
+        historial=historial,
+        institucion=NOMBRE_INSTITUCION,
+        mes_seleccionado=f"{anio:04d}-{mes:02d}",
+        mes_actual=f"{hoy.year:04d}-{hoy.month:02d}",
+    )
+
+
+@app.route("/admin/asistencia/<nie>/pdf")
+@requiere_login
+def admin_asistencia_estudiante_pdf(nie):
+    estudiante = obtener_estudiante_por_nie(nie)
+    if estudiante is None:
+        return render_template("error.html", nie=nie, institucion=NOMBRE_INSTITUCION), 404
+    if not puede_administrar(estudiante):
+        flash("No tienes permiso para ver la asistencia de otro salón.", "error")
+        return redirect(url_for("admin_lista"))
+
+    anio, mes = leer_mes_de_query()
+    historial = obtener_historial_asistencia(nie, anio, mes)
+    nombre_mes = MESES_ES[mes]
+
+    color_vino = colors.HexColor("#6E1423")
+    color_pizarra = colors.HexColor("#6B7280")
+    color_linea = colors.HexColor("#E1DBC9")
+    color_franja = colors.HexColor("#F5F1E6")
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer, pagesize=letter,
+        topMargin=2 * cm, bottomMargin=2 * cm, leftMargin=2 * cm, rightMargin=2 * cm,
+        title=f"Asistencia de {estudiante['nombres']} {estudiante['apellidos']}",
+    )
+    estilos = getSampleStyleSheet()
+    estilo_institucion = ParagraphStyle("Institucion", parent=estilos["Normal"],
+                                         textColor=color_pizarra, fontSize=10, spaceAfter=6)
+    estilo_titulo = ParagraphStyle("TituloVino", parent=estilos["Title"],
+                                    textColor=color_vino, fontSize=18, spaceAfter=10)
+    estilo_info = ParagraphStyle("Info", parent=estilos["Normal"], fontSize=10.5, leading=16)
+
+    contenido = [
+        Paragraph(NOMBRE_INSTITUCION, estilo_institucion),
+        Paragraph(f"Reporte de asistencia · {estudiante['nombres']} {estudiante['apellidos']}", estilo_titulo),
+    ]
+    info_lineas = [
+        f"<b>NIE:</b> {estudiante['nie']}",
+        f"<b>Salón / Grado:</b> {estudiante['grado'] or '—'}",
+        f"<b>Carrera:</b> {estudiante['carrera'] or '—'}",
+        f"<b>Sección:</b> {estudiante['seccion'] or '—'}",
+        f"<b>Mes reportado:</b> {nombre_mes} {anio}",
+        f"<b>Generado el:</b> {datetime.now().strftime('%d/%m/%Y %I:%M %p')}",
+    ]
+    for linea in info_lineas:
+        contenido.append(Paragraph(linea, estilo_info))
+    contenido.append(Spacer(1, 18))
+
+    datos_tabla = [["Fecha", "Entrada", "Salida"]]
+    if historial:
+        for h in historial:
+            if h["hora_entrada"] or h["hora_salida"]:
+                datos_tabla.append([
+                    h["fecha"].strftime("%d/%m/%Y"),
+                    h["hora_entrada"].strftime("%I:%M %p") if h["hora_entrada"] else "—",
+                    h["hora_salida"].strftime("%I:%M %p") if h["hora_salida"] else "—",
+                ])
+            elif h.get("tiene_permiso"):
+                datos_tabla.append([h["fecha"].strftime("%d/%m/%Y"), "Inasistencia con permiso", ""])
+            else:
+                datos_tabla.append([h["fecha"].strftime("%d/%m/%Y"), "Inasistencia", ""])
+    else:
+        datos_tabla.append(["Sin marcaciones registradas todavía.", "", ""])
+
+    tabla = Table(datos_tabla, colWidths=[6 * cm, 5 * cm, 5 * cm])
+    tabla.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), color_vino),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 10),
+        ("TOPPADDING", (0, 0), (-1, 0), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, 0), 8),
+        ("GRID", (0, 0), (-1, -1), 0.5, color_linea),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, color_franja]),
+        ("ALIGN", (1, 0), (-1, -1), "CENTER"),
+    ]))
+    contenido.append(tabla)
+
+    doc.build(contenido)
+    buffer.seek(0)
+    nombre_archivo = f"asistencia_{estudiante['nie']}.pdf"
+    return send_file(buffer, mimetype="application/pdf", as_attachment=True, download_name=nombre_archivo)
+
+
+# ---------------------------------------------------------------------------
+# Rutas públicas (carné, QR, foto)
+# ---------------------------------------------------------------------------
+
+@app.route("/")
+def inicio():
+    return render_template("inicio.html", institucion=NOMBRE_INSTITUCION)
+
+
+@app.route("/student/<nie>")
+def carnet(nie):
+    estudiante = obtener_estudiante_por_nie(nie)
+    if estudiante is None:
+        return render_template("error.html", nie=nie, institucion=NOMBRE_INSTITUCION), 404
+    # No registrar marcación si quien abre el carné es un admin logueado
+    # revisándolo desde el panel (evita marcaciones falsas).
+    if not session.get("admin_usuario"):
+        registrar_asistencia(nie)
+    return render_template("carnet.html", est=estudiante, institucion=NOMBRE_INSTITUCION)
+
+
+@app.route("/qr/<nie>.png")
+def qr_estudiante(nie):
+    """QR generado al vuelo (respaldo del NFC) — usa siempre el dominio
+    real desde donde se accede, sin depender de archivos guardados."""
+    estudiante = obtener_estudiante_por_nie(nie)
+    if estudiante is None:
+        return "", 404
+
+    url = url_for("carnet", nie=nie, _external=True)
+    qr = qrcode.QRCode(version=None, error_correction=qrcode.constants.ERROR_CORRECT_M,
+                        box_size=10, border=4)
+    qr.add_data(url)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="#6E1423", back_color="white")
+
+    buffer = BytesIO()
+    img.save(buffer, format="PNG")
+    buffer.seek(0)
+    return send_file(buffer, mimetype="image/png")
+
+
+@app.route("/foto/<nie>")
+def foto_estudiante(nie):
+    foto_bytes, foto_tipo = obtener_foto(nie)
+    if foto_bytes is None:
+        return "", 404
+    return send_file(BytesIO(foto_bytes), mimetype=foto_tipo or "image/jpeg")
+
+
+@app.errorhandler(404)
+def no_encontrado(e):
+    return render_template("error.html", nie=None, institucion=NOMBRE_INSTITUCION), 404
+
+
+if __name__ == "__main__":
+    puerto = int(os.getenv("FLASK_PORT", "5000"))
+    ip_local = get_local_ip()
+    print("=" * 60)
+    print(" Carné Digital corriendo")
+    print(f" En esta misma PC:   http://127.0.0.1:{puerto}")
+    print(f" Desde el celular:   http://{ip_local}:{puerto}")
+    print("   (el celular debe estar en la MISMA red Wi-Fi que esta PC)")
+    print(f" Panel de administración: http://127.0.0.1:{puerto}/admin")
+    print("=" * 60)
+    app.run(host="0.0.0.0", port=puerto, debug=True)

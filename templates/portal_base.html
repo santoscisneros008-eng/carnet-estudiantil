@@ -9,7 +9,11 @@
 <body>
   <header class="portal-cabecera">
     <div class="portal-cabecera__fila">
-      <img class="portal-cabecera__escudo" src="{{ url_for('static', filename='img/logo-100-anos.png') }}" alt="">
+      {% if tiene_foto %}
+        <img class="portal-cabecera__escudo" src="{{ url_for('foto_estudiante', nie=nie) }}" alt="">
+      {% else %}
+        <div class="portal-cabecera__escudo portal-cabecera__escudo--iniciales">{{ nombre[0] }}</div>
+      {% endif %}
       <div>
         <div class="portal-cabecera__nombre">{{ nombre }}</div>
         <div class="portal-cabecera__meta">NIE {{ nie }}</div>

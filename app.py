@@ -579,6 +579,28 @@ def requiere_estudiante(vista):
     return envoltura
 
 
+@app.context_processor
+def inyectar_foto_del_portal():
+    """Disponible en cualquier plantilla: True si el estudiante logueado
+    tiene foto de perfil, para mostrarla en el encabezado del portal
+    (o las iniciales de respaldo si no tiene)."""
+    nie = session.get("estudiante_nie")
+    if not nie:
+        return {}
+    conn = None
+    try:
+        conn = get_conn()
+        with conn.cursor() as cur:
+            cur.execute("SELECT foto IS NOT NULL FROM estudiantes WHERE nie = %s", (nie,))
+            fila = cur.fetchone()
+            return {"tiene_foto": bool(fila and fila[0])}
+    except Exception:
+        return {"tiene_foto": False}
+    finally:
+        if conn is not None:
+            conn.close()
+
+
 @app.route("/admin/login", methods=["GET", "POST"])
 def admin_login():
     error = None
