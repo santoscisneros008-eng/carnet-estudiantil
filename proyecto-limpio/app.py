@@ -115,6 +115,20 @@ def obtener_estudiante_por_nie(nie: str):
     finally:
         if conn is not None:
             conn.close()
+            hoy = date.today()
+    historial = []
+    dia = hoy
+    while dia >= fecha_inicio:
+        if dia.weekday() < 5:  # 0=lunes ... 4=viernes (se saltan sábado y domingo)
+            
+            marcacion = marcaciones.get(dia)
+            historial.append({
+                "fecha": dia,
+                "hora_entrada": marcacion["hora_entrada"] if marcacion else None,
+                "hora_salida": marcacion["hora_salida"] if marcacion else None,
+            })
+        dia -= timedelta(days=1)
+    return historial
 
 
 def obtener_foto(nie: str):

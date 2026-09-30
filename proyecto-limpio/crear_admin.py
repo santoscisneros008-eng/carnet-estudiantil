@@ -21,11 +21,11 @@ load_dotenv()
 
 def get_conn():
     return psycopg2.connect(
-        host=os.getenv("PGHOST"),
-        port=os.getenv("PGPORT", "5432"),
-        dbname=os.getenv("PGDATABASE"),
-        user=os.getenv("PGUSER"),
-        password=os.getenv("PGPASSWORD"),
+        host=os.getenv("pg-13b54d16-santoscisneros008-d62c.i.aivencloud.com"),
+        port=os.getenv("PGPORT", "28517"),
+        dbname=os.getenv("defaultdb"),
+        user=os.getenv("avnadmin"),
+        password=os.getenv("AVNS_URq0ybSudfUmPOzXR0c"),
         sslmode=os.getenv("PGSSLMODE", "require"),
         connect_timeout=8,
     )

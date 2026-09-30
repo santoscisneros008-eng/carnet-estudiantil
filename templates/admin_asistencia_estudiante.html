@@ -14,46 +14,23 @@
         <div class="institucion">NIE {{ est.nie }} · {{ est.grado or 'Sin salón asignado' }}{% if est.carrera %} · {{ est.carrera }}{% endif %}</div>
       </div>
       <div style="display:flex; gap:8px;">
-        <a class="admin-link" href="{{ url_for('admin_asistencia_estudiante_pdf', nie=est.nie, mes=mes_seleccionado) }}">↓ Descargar PDF</a>
+        <a class="admin-link" href="{{ url_for('admin_asistencia_estudiante_pdf', nie=est.nie) }}">↓ Descargar PDF</a>
         <a class="admin-link" href="{{ url_for('carnet', nie=est.nie) }}" target="_blank">Ver carné</a>
         <a class="admin-link admin-link--ghost" href="{{ url_for('admin_asistencia') }}">← Asistencia de hoy</a>
       </div>
     </div>
 
     <div class="admin-card">
-      <form method="get" class="asistencia-filtro">
-        <div class="campo">
-          <label for="mes">Mes</label>
-          <input type="month" id="mes" name="mes" value="{{ mes_seleccionado }}" max="{{ mes_actual }}"
-                 onchange="this.form.submit()">
-        </div>
-        {% if mes_seleccionado == mes_actual %}
-          <span class="pill-mini pill-mini--activo" style="align-self:end; margin-bottom:10px;">Mes actual</span>
-        {% endif %}
-      </form>
-
       {% if historial %}
       <table class="admin-tabla">
-        <thead>
-          <tr>
-            <th>Fecha</th>
-            <th>Entrada</th>
-            <th>Salida</th>
-          </tr>
-        </thead>
+        <thead><tr><th>Fecha</th><th>Entrada</th><th>Salida</th></tr></thead>
         <tbody>
           {% for h in historial %}
-          <tr>
+                    <tr>
             <td>{{ h.fecha.strftime('%d/%m/%Y') }}</td>
             {% if h.hora_entrada or h.hora_salida %}
             <td>{{ h.hora_entrada.strftime('%I:%M %p') if h.hora_entrada else '—' }}</td>
             <td>{{ h.hora_salida.strftime('%I:%M %p') if h.hora_salida else '—' }}</td>
-            {% elif h.tiene_permiso %}
-            <td colspan="2" style="text-align:center; color:#B8860B; font-weight:600;">
-              Inasistencia con permiso
-              <a href="{{ url_for('permiso_imagen', nie=est.nie, fecha_str=h.fecha.isoformat()) }}"
-                 target="_blank" style="font-weight:500; margin-left:6px;">(ver constancia)</a>
-            </td>
             {% else %}
             <td colspan="2" style="text-align:center; color:var(--alerta); font-weight:600;">Inasistencia</td>
             {% endif %}
@@ -62,10 +39,9 @@
         </tbody>
       </table>
       {% else %}
-        <div class="admin-vacio">No hay días que mostrar en este mes.</div>
+        <div class="admin-vacio">Este estudiante todavía no tiene marcaciones registradas.</div>
       {% endif %}
     </div>
   </div>
-  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>
