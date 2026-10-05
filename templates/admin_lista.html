@@ -22,6 +22,12 @@
       </div>
       <div style="display:flex; gap:8px;">
         <a class="admin-link" href="{{ url_for('admin_asistencia') }}">Asistencia</a>
+        <a class="admin-link" href="{{ url_for('admin_notificaciones') }}" style="position:relative;">
+  🔔 Avisos
+  {% if notif_no_leidas and notif_no_leidas > 0 %}
+    <span style="position:absolute; top:-7px; right:-7px; background:var(--alerta); color:white; font-size:10px; font-weight:700; border-radius:999px; min-width:18px; height:18px; display:flex; align-items:center; justify-content:center; padding:0 4px; line-height:1;">{{ notif_no_leidas }}</span>
+  {% endif %}
+</a>
         {% if es_director %}
         <a class="admin-link" href="{{ url_for('admin_nuevo') }}">+ Agregar estudiante</a>
         {% endif %}

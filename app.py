@@ -681,6 +681,88 @@ def portal_asistencia():
     )
 
 
+@app.route("/portal/asistencia/pdf")
+@requiere_estudiante
+def portal_asistencia_pdf():
+    nie = session["estudiante_nie"]
+    estudiante = obtener_estudiante_por_nie(nie)
+    if estudiante is None:
+        return render_template("error.html", nie=nie, institucion=NOMBRE_INSTITUCION), 404
+
+    anio, mes = leer_mes_de_query()
+    historial = obtener_historial_asistencia(nie, anio, mes)
+    nombre_mes = MESES_ES[mes]
+
+    color_vino = colors.HexColor("#6E1423")
+    color_pizarra = colors.HexColor("#6B7280")
+    color_linea = colors.HexColor("#E1DBC9")
+    color_franja = colors.HexColor("#F5F1E6")
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer, pagesize=letter,
+        topMargin=2 * cm, bottomMargin=2 * cm, leftMargin=2 * cm, rightMargin=2 * cm,
+        title=f"Asistencia de {estudiante['nombres']} {estudiante['apellidos']}",
+    )
+    estilos = getSampleStyleSheet()
+    estilo_institucion = ParagraphStyle("InstitucionPortal", parent=estilos["Normal"],
+                                         textColor=color_pizarra, fontSize=10, spaceAfter=6)
+    estilo_titulo = ParagraphStyle("TituloVinoPortal", parent=estilos["Title"],
+                                    textColor=color_vino, fontSize=18, spaceAfter=10)
+    estilo_info = ParagraphStyle("InfoPortal", parent=estilos["Normal"], fontSize=10.5, leading=16)
+
+    contenido = [
+        Paragraph(NOMBRE_INSTITUCION, estilo_institucion),
+        Paragraph(f"Reporte de asistencia · {estudiante['nombres']} {estudiante['apellidos']}", estilo_titulo),
+    ]
+    info_lineas = [
+        f"<b>NIE:</b> {estudiante['nie']}",
+        f"<b>Salón / Grado:</b> {estudiante['grado'] or '—'}",
+        f"<b>Carrera:</b> {estudiante['carrera'] or '—'}",
+        f"<b>Sección:</b> {estudiante['seccion'] or '—'}",
+        f"<b>Mes reportado:</b> {nombre_mes} {anio}",
+        f"<b>Generado el:</b> {datetime.now().strftime('%d/%m/%Y %I:%M %p')}",
+    ]
+    for linea in info_lineas:
+        contenido.append(Paragraph(linea, estilo_info))
+    contenido.append(Spacer(1, 18))
+
+    datos_tabla = [["Fecha", "Entrada", "Salida"]]
+    if historial:
+        for h in historial:
+            if h["hora_entrada"] or h["hora_salida"]:
+                datos_tabla.append([
+                    h["fecha"].strftime("%d/%m/%Y"),
+                    h["hora_entrada"].strftime("%I:%M %p") if h["hora_entrada"] else "—",
+                    h["hora_salida"].strftime("%I:%M %p") if h["hora_salida"] else "—",
+                ])
+            elif h.get("tiene_permiso"):
+                datos_tabla.append([h["fecha"].strftime("%d/%m/%Y"), "Inasistencia con permiso", ""])
+            else:
+                datos_tabla.append([h["fecha"].strftime("%d/%m/%Y"), "Inasistencia", ""])
+    else:
+        datos_tabla.append(["Sin marcaciones registradas en este mes.", "", ""])
+
+    tabla = Table(datos_tabla, colWidths=[6 * cm, 5 * cm, 5 * cm])
+    tabla.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), color_vino),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 10),
+        ("TOPPADDING", (0, 0), (-1, 0), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, 0), 8),
+        ("GRID", (0, 0), (-1, -1), 0.5, color_linea),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, color_franja]),
+        ("ALIGN", (1, 0), (-1, -1), "CENTER"),
+    ]))
+    contenido.append(tabla)
+
+    doc.build(contenido)
+    buffer.seek(0)
+    nombre_archivo = f"mi_asistencia_{nie}_{anio}-{mes:02d}.pdf"
+    return send_file(buffer, mimetype="application/pdf", as_attachment=True, download_name=nombre_archivo)
+
+
 @app.route("/portal/permiso", methods=["GET", "POST"])
 @requiere_estudiante
 def portal_permiso():
@@ -728,6 +810,7 @@ def portal_permiso():
             dia += timedelta(days=1)
 
         if dias_guardados:
+            notificar_permiso_subido(nie, fecha_inicio, fecha_fin)
             if fecha_inicio == fecha_fin:
                 flash(f"Constancia del {fecha_inicio.strftime('%d/%m/%Y')} subida correctamente.", "exito")
             else:
@@ -1060,6 +1143,154 @@ def no_encontrado(e):
     return render_template("error.html", nie=None, institucion=NOMBRE_INSTITUCION), 404
 
 
+# =========================================================
+# Notificaciones de permisos para maestros y Dirección
+# =========================================================
+
+def crear_notificacion_permiso(nie, nombres, apellidos, grado, fecha_inicio, fecha_fin):
+    """Avisa al maestro del salón (y a Dirección) que se subió una constancia."""
+    conn = None
+    try:
+        conn = get_conn()
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO notificaciones (nie, nombres, apellidos, grado, fecha_inicio, fecha_fin)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                """,
+                (nie, nombres, apellidos, grado, fecha_inicio, fecha_fin),
+            )
+        conn.commit()
+    except Exception:
+        if conn is not None:
+            conn.rollback()
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+def obtener_notificaciones(usuario_admin, es_dir, grado_propio):
+    """Dirección ve todas; un profesor solo las de su propio salón."""
+    conn = None
+    try:
+        conn = get_conn()
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            consulta = """
+                SELECT n.id, n.nie, n.nombres, n.apellidos, n.grado,
+                       n.fecha_inicio, n.fecha_fin, n.creado_en,
+                          (SELECT MIN(p.fecha) FROM permisos p
+                           WHERE p.nie = n.nie
+                           AND p.fecha BETWEEN n.fecha_inicio AND n.fecha_fin) AS fecha_constancia,
+                       (l.admin_usuario IS NOT NULL) AS leida
+                FROM notificaciones n
+                LEFT JOIN notificaciones_leidas l
+                    ON l.notificacion_id = n.id AND l.admin_usuario = %s
+            """
+            parametros = [usuario_admin]
+            if not es_dir:
+                consulta += " WHERE LOWER(TRIM(n.grado)) = LOWER(TRIM(%s))"
+                parametros.append(grado_propio)
+            consulta += " ORDER BY n.creado_en DESC"
+            cur.execute(consulta, parametros)
+            return cur.fetchall()
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+def contar_notificaciones_no_leidas(usuario_admin, es_dir, grado_propio):
+    conn = None
+    try:
+        conn = get_conn()
+        with conn.cursor() as cur:
+            consulta = """
+                SELECT COUNT(*)
+                FROM notificaciones n
+                LEFT JOIN notificaciones_leidas l
+                    ON l.notificacion_id = n.id AND l.admin_usuario = %s
+                WHERE l.admin_usuario IS NULL
+            """
+            parametros = [usuario_admin]
+            if not es_dir:
+                consulta += " AND LOWER(TRIM(n.grado)) = LOWER(TRIM(%s))"
+                parametros.append(grado_propio)
+            cur.execute(consulta, parametros)
+            fila = cur.fetchone()
+            return fila[0] if fila else 0
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+def marcar_notificacion_leida(notificacion_id, usuario_admin):
+    conn = None
+    try:
+        conn = get_conn()
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO notificaciones_leidas (notificacion_id, admin_usuario)
+                VALUES (%s, %s)
+                ON CONFLICT DO NOTHING
+                """,
+                (notificacion_id, usuario_admin),
+            )
+        conn.commit()
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+@app.context_processor
+def inyectar_notificaciones_admin():
+    """Deja el contador de avisos sin leer disponible en cualquier plantilla de admin."""
+    if not session.get("admin_usuario"):
+        return {}
+    try:
+        n = contar_notificaciones_no_leidas(session["admin_usuario"], es_director(), grado_sesion())
+        return {"notif_no_leidas": n}
+    except Exception:
+        return {"notif_no_leidas": 0}
+
+
+@app.route("/admin/notificaciones")
+@requiere_login
+def admin_notificaciones():
+    usuario = session["admin_usuario"]
+    notificaciones = obtener_notificaciones(usuario, es_director(), grado_sesion())
+    return render_template(
+        "admin_notificaciones.html",
+        notificaciones=notificaciones,
+        institucion=NOMBRE_INSTITUCION,
+        es_director=es_director(),
+    )
+
+
+@app.route("/admin/notificaciones/<int:notif_id>/leida", methods=["POST"])
+@requiere_login
+def admin_notificacion_leida(notif_id):
+    marcar_notificacion_leida(notif_id, session["admin_usuario"])
+    return redirect(request.referrer or url_for("admin_notificaciones"))
+
+
+    
+
+
+
+
+def notificar_permiso_subido(nie, fecha_inicio, fecha_fin):
+    """Busca los datos del estudiante y crea el aviso para su maestro y Dirección."""
+    estudiante = obtener_estudiante_por_nie(nie)
+    if estudiante:
+        crear_notificacion_permiso(
+            nie,
+            estudiante["nombres"],
+            estudiante["apellidos"],
+            estudiante["grado"],
+            fecha_inicio,
+            fecha_fin,
+        )
+
 if __name__ == "__main__":
     puerto = int(os.getenv("FLASK_PORT", "5000"))
     ip_local = get_local_ip()
@@ -1071,3 +1302,4 @@ if __name__ == "__main__":
     print(f" Panel de administración: http://127.0.0.1:{puerto}/admin")
     print("=" * 60)
     app.run(host="0.0.0.0", port=puerto, debug=True)
+

@@ -16,6 +16,10 @@
            onchange="this.form.submit()">
   </form>
 
+    <a href="{{ url_for('portal_asistencia_pdf', mes=mes_seleccionado) }}" class="boton-portal" style="display:block; text-align:center; text-decoration:none; margin-bottom:18px;">
+    ↓ Descargar mi asistencia en PDF
+  </a>
+
   {% if historial %}
   <div class="resumen">
     <div class="resumen__bloque">

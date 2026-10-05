@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Avisos · {{ institucion }}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <div class="admin-shell">
+    <div class="admin-topbar">
+      <div>
+        <h1>Avisos de permisos</h1>
+        <div class="institucion">
+          {{ institucion }} ·
+          {% if es_director %}
+            <span class="sesion-info">Director — todos los salones</span>
+          {% else %}
+            <span class="sesion-info">Solo tu salón</span>
+          {% endif %}
+        </div>
+      </div>
+      <a class="admin-link admin-link--ghost" href="{{ url_for('admin_lista') }}">← Estudiantes</a>
+    </div>
+
+    <div class="admin-card">
+      {% if notificaciones %}
+        <table class="admin-tabla">
+          <thead>
+            <tr>
+              <th>Estudiante</th>
+              {% if es_director %}<th>Salón</th>{% endif %}
+              <th>Fechas cubiertas</th>
+              <th>Subido</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for n in notificaciones %}
+            <tr style="{{ 'opacity:0.6;' if n.leida }}">
+              <td>
+                {% if not n.leida %}<span class="pill-mini pill-mini--otro" style="margin-right:6px;">Nuevo</span>{% endif %}
+                {{ n.nombres }} {{ n.apellidos }}
+              </td>
+              {% if es_director %}<td>{{ n.grado or '—' }}</td>{% endif %}
+              <td>
+                {% if n.fecha_inicio == n.fecha_fin %}
+                  {{ n.fecha_inicio.strftime('%d/%m/%Y') }}
+                {% else %}
+                  {{ n.fecha_inicio.strftime('%d/%m/%Y') }} – {{ n.fecha_fin.strftime('%d/%m/%Y') }}
+                {% endif %}
+              </td>
+              <td>{{ n.creado_en.strftime('%d/%m/%Y %I:%M %p') }}</td>
+              <td style="display:flex; gap:8px;">
+                <a href="{{ url_for('admin_asistencia_estudiante', nie=n.nie) }}">Ver asistencia →</a>
+                {% if not n.leida %}
+                <form method="post" action="{{ url_for('admin_notificacion_leida', notif_id=n.id) }}">
+                  <button type="submit" class="admin-link" style="padding:4px 10px; font-size:12px;">Marcar leída</button>
+                </form>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <div class="admin-vacio">No hay avisos de permisos todavía.</div>
+      {% endif %}
+    </div>
+  </div>
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

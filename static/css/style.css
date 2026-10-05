@@ -303,3 +303,40 @@ body.pagina-login-admin {
 .pagina-login-admin .sub {
   color: var(--carbon);
 }   
+/* ===== Tarjeta de login de admin en la esquina ===== */
+@media (min-width: 700px) {
+  body.pagina-login-admin .login-shell {
+    position: fixed;
+    right: 48px;
+    bottom: 48px;
+    margin: 0;
+    z-index: 1;
+    max-height: calc(100vh - 96px);
+    overflow-y: auto;
+  }
+}
+
+
+/* ===== Vista de celular del panel de administración (pantallas de hasta 700px) ===== */
+@media (max-width: 700px) {
+  body { padding: 20px 12px 48px; }
+  .admin-topbar > div:last-child { flex-wrap: wrap !important; }
+  .admin-card { padding: 14px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .admin-tabla { min-width: 520px; }
+  .admin-tabla th, .admin-tabla td { padding: 8px 6px; }
+  .admin-tabla td a, .admin-tabla td button, .admin-tabla td .pill-mini { white-space: nowrap; }
+
+  /* Lista diaria de asistencia: se oculta el NIE para que se vean Entrada, Salida y Asistió */
+  .tabla-diaria { min-width: 0; }
+  .tabla-diaria th:nth-child(1), .tabla-diaria td:nth-child(1) { display: none; }
+  .tabla-diaria td a { white-space: normal; }
+  .tabla-diaria th, .tabla-diaria td { font-size: 12.5px; }
+
+  /* Lista de estudiantes: se ocultan Carrera, Sección y Estado */
+  .tabla-lista { min-width: 0; }
+  .tabla-lista th:nth-child(3), .tabla-lista td:nth-child(3),
+  .tabla-lista th:nth-child(4), .tabla-lista td:nth-child(4),
+  .tabla-lista th:nth-child(5), .tabla-lista td:nth-child(5) { display: none; }
+  .tabla-lista td a { white-space: normal; }
+  .tabla-lista th, .tabla-lista td { font-size: 12.5px; }
+}
