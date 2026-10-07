@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>{% block titulo %}Administrador general{% endblock %} · {{ institucion }}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <div class="admin-shell">
+    <div class="admin-topbar">
+      <div>
+        <h1>{% block encabezado %}Administrador general{% endblock %}</h1>
+        <div class="institucion">{{ institucion }} · <span class="sesion-info">{{ sa_usuario }}</span></div>
+      </div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <a class="admin-link" href="{{ url_for('superadmin.inicio') }}">Inicio</a>
+        <a class="admin-link" href="{{ url_for('superadmin.cuentas') }}">Cuentas</a>
+        <a class="admin-link" href="{{ url_for('superadmin.estudiantes') }}">Estudiantes</a>
+        <a class="admin-link" href="{{ url_for('superadmin.bitacora') }}">Bitácora</a>
+        <form method="post" action="{{ url_for('superadmin.logout') }}" style="display:inline;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="admin-link admin-link--ghost" style="cursor:pointer;">Salir</button>
+        </form>
+      </div>
+    </div>
+
+    {% with mensajes = get_flashed_messages(with_categories=true) %}
+      {% for categoria, texto in mensajes %}
+        <div class="flash flash--{{ categoria }}">{{ texto }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    {% if clave_temporal %}
+    <div class="admin-card" style="border:2px solid var(--laton); background:#FFFBEA;">
+      <b>Contraseña temporal para {{ clave_temporal.para }}:</b>
+      <div style="font-family:monospace; font-size:24px; letter-spacing:1px; margin:10px 0; user-select:all; word-break:break-all;">{{ clave_temporal.clave }}</div>
+      <div style="font-size:12.5px; color:var(--pizarra);">Anótala ahora: <b>no se vuelve a mostrar</b>. Entrégala en persona o por un medio privado.</div>
+    </div>
+    {% endif %}
+
+    {% block contenido %}{% endblock %}
+  </div>
+</body>
+</html>

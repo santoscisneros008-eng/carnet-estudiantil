@@ -1,0 +1,51 @@
+{% extends "sa_base.html" %}
+{% block titulo %}Bitácora{% endblock %}
+{% block encabezado %}Bitácora{% endblock %}
+{% block contenido %}
+  <div class="admin-card">
+    <form method="get" style="display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end;">
+      <div class="campo" style="flex:1 1 160px;">
+        <label for="actor">Quién</label>
+        <input type="text" id="actor" name="actor" value="{{ actor }}">
+      </div>
+      <div class="campo" style="flex:1 1 220px;">
+        <label for="accion">Qué hizo</label>
+        <select id="accion" name="accion">
+          <option value="">Todo</option>
+          {% for codigo, nombre in acciones.items() %}<option value="{{ codigo }}" {{ 'selected' if codigo == accion }}>{{ nombre }}</option>{% endfor %}
+        </select>
+      </div>
+      <button type="submit" class="btn-primario" style="width:auto;">Filtrar</button>
+    </form>
+  </div>
+
+  <div class="admin-card">
+    {% if filas %}
+    <div style="overflow-x:auto;">
+      <table class="admin-tabla">
+        <thead><tr><th>Cuándo</th><th>Quién</th><th>Qué</th><th>Sobre</th><th>Detalle</th></tr></thead>
+        <tbody>
+          {% for f in filas %}
+          <tr>
+            <td style="white-space:nowrap;">{{ f.fecha | sa_fecha_hora }}</td>
+            <td>{{ f.actor }}</td>
+            <td>{{ f.etiqueta }}</td>
+            <td>{{ f.objeto or '—' }}</td>
+            <td style="font-size:12.5px; color:var(--pizarra); min-width:200px;">{{ f.detalle or '' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px; flex-wrap:wrap; gap:8px;">
+      <span style="font-size:12.5px; color:var(--pizarra);">{{ total }} registro(s) · página {{ pagina }} de {{ paginas }}</span>
+      <span>
+        {% if pagina > 1 %}<a class="admin-link" href="{{ url_for('superadmin.bitacora', actor=actor, accion=accion, p=pagina-1) }}">← Más recientes</a>{% endif %}
+        {% if pagina < paginas %}<a class="admin-link" href="{{ url_for('superadmin.bitacora', actor=actor, accion=accion, p=pagina+1) }}">Más antiguos →</a>{% endif %}
+      </span>
+    </div>
+    {% else %}
+      <div class="admin-vacio">No hay registros con ese filtro.</div>
+    {% endif %}
+  </div>
+{% endblock %}

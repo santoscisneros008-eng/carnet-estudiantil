@@ -1,0 +1,49 @@
+{% extends "sa_base.html" %}
+{% block titulo %}Estudiantes{% endblock %}
+{% block encabezado %}Estudiantes{% endblock %}
+{% block contenido %}
+  <div class="admin-card">
+    <form method="get" class="asistencia-filtro" style="display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end;">
+      <div class="campo" style="flex:2 1 220px;">
+        <label for="q">Buscar por nombre o NIE</label>
+        <input type="text" id="q" name="q" value="{{ q }}" autofocus>
+      </div>
+      <div class="campo" style="flex:1 1 180px;">
+        <label for="grado">Salón</label>
+        <select id="grado" name="grado">
+          <option value="">Todos</option>
+          {% for g in grados %}<option value="{{ g }}" {{ 'selected' if g == grado }}>{{ g }}</option>{% endfor %}
+        </select>
+      </div>
+      <button type="submit" class="btn-primario" style="width:auto;">Buscar</button>
+    </form>
+  </div>
+
+  <div class="admin-card">
+    {% if estudiantes %}
+    <div style="overflow-x:auto;">
+      <table class="admin-tabla">
+        <thead><tr><th>NIE</th><th>Nombre completo</th><th>Salón</th><th>Estado</th><th>Portal</th><th>Tarjetas</th><th></th></tr></thead>
+        <tbody>
+          {% for e in estudiantes %}
+          <tr>
+            <td>{{ e.nie }}</td>
+            <td>{{ e.nombres }} {{ e.apellidos }}</td>
+            <td>{{ e.grado or '—' }}</td>
+            <td><span class="pill-mini {{ '' if e.estado == 'ACTIVO' else 'pill-mini--otro' }}">{{ e.estado }}</span></td>
+            <td>{{ 'Con contraseña' if e.tiene_clave else 'Sin contraseña' }}</td>
+            <td>{{ e.tarjetas }}</td>
+            <td style="white-space:nowrap;"><a href="{{ url_for('superadmin.estudiante_editar', nie=e.nie) }}">Editar →</a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if hay_mas %}
+      <p style="font-size:12.5px; color:var(--pizarra);">Se muestran los primeros {{ limite }}. Usa el buscador para afinar.</p>
+    {% endif %}
+    {% else %}
+      <div class="admin-vacio">No hay estudiantes con esa búsqueda.</div>
+    {% endif %}
+  </div>
+{% endblock %}

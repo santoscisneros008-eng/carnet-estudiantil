@@ -1,0 +1,53 @@
+{% extends "sa_base.html" %}
+{% block titulo %}Editar cuenta{% endblock %}
+{% block encabezado %}Cuenta: {{ cuenta.usuario }}{% endblock %}
+{% block contenido %}
+  <div class="admin-card">
+    <b>Datos de la cuenta</b>
+    <form method="post" action="{{ url_for('superadmin.cuenta_editar', cuenta_id=cuenta.id) }}" style="margin-top:12px;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="form-grid">
+        <div class="campo">
+          <label for="usuario">Usuario</label>
+          <input type="text" id="usuario" name="usuario" value="{{ cuenta.usuario }}" required autocomplete="off">
+        </div>
+        <div class="campo">
+          <label for="rol">Tipo de cuenta</label>
+          <select id="rol" name="rol">
+            {% for r in roles %}<option value="{{ r }}" {{ 'selected' if cuenta.rol == r }}>{{ rol_nombre[r] }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="campo full">
+          <label for="grado">Salón (solo docentes)</label>
+          <input type="text" id="grado" name="grado" list="lista-grados" value="{{ cuenta.grado or '' }}">
+          <datalist id="lista-grados">{% for g in grados %}<option value="{{ g }}">{% endfor %}</datalist>
+        </div>
+      </div>
+      <div class="form-acciones"><button type="submit" class="btn-primario">Guardar cambios</button></div>
+    </form>
+  </div>
+
+  <div class="admin-card">
+    <b>Restablecer contraseña</b>
+    <form method="post" action="{{ url_for('superadmin.cuenta_clave', cuenta_id=cuenta.id) }}" style="margin-top:12px;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="campo">
+        <label for="password">Contraseña nueva (déjala vacía para generar una automática)</label>
+        <input type="text" id="password" name="password" autocomplete="off">
+      </div>
+      <div class="form-acciones"><button type="submit" class="btn-primario">Restablecer contraseña</button></div>
+    </form>
+  </div>
+
+  <div class="admin-card" style="border-color:rgba(179,69,44,0.35);">
+    <b style="color:var(--alerta);">Eliminar cuenta</b>
+    <p style="font-size:13px; color:var(--pizarra);">Esta persona ya no podrá entrar. No se puede deshacer.</p>
+    <form method="post" action="{{ url_for('superadmin.cuenta_eliminar', cuenta_id=cuenta.id) }}"
+          onsubmit="return confirm('¿Eliminar la cuenta {{ cuenta.usuario }}? No se puede deshacer.');">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="btn-eliminar">Eliminar esta cuenta</button>
+    </form>
+  </div>
+
+  <a class="admin-link admin-link--ghost" href="{{ url_for('superadmin.cuentas') }}">← Volver a las cuentas</a>
+{% endblock %}

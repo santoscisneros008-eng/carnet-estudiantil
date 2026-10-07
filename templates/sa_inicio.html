@@ -1,0 +1,40 @@
+{% extends "sa_base.html" %}
+{% block contenido %}
+  <div style="display:flex; flex-wrap:wrap; gap:12px; margin-bottom:18px;">
+    {% for numero, etiqueta, enlace in [
+        (datos.estudiantes, 'Estudiantes (' ~ datos.activos ~ ' activos)', url_for('superadmin.estudiantes')),
+        (datos.docentes, 'Docentes', url_for('superadmin.cuentas')),
+        (datos.directores, 'Cuentas de Dirección', url_for('superadmin.cuentas')),
+        (datos.sin_clave, 'Estudiantes sin contraseña del portal', url_for('superadmin.estudiantes')),
+        (datos.sin_tarjeta, 'Estudiantes sin tarjeta NFC', url_for('superadmin.estudiantes')) ] %}
+    <a href="{{ enlace }}" style="flex:1 1 150px; text-decoration:none; background:white; border:1px solid #E9E3D3; border-radius:14px; padding:16px;">
+      <div style="font-size:30px; font-weight:700; color:var(--tinta); line-height:1;">{{ numero }}</div>
+      <div style="font-size:12.5px; color:var(--pizarra); margin-top:6px;">{{ etiqueta }}</div>
+    </a>
+    {% endfor %}
+  </div>
+
+  <div class="admin-card">
+    <b>Actividad reciente</b>
+    {% if recientes %}
+    <div style="overflow-x:auto;">
+      <table class="admin-tabla" style="margin-top:8px;">
+        <thead><tr><th>Cuándo</th><th>Quién</th><th>Qué</th><th>Sobre</th></tr></thead>
+        <tbody>
+          {% for f in recientes %}
+          <tr>
+            <td style="white-space:nowrap;">{{ f.fecha | sa_fecha_hora }}</td>
+            <td>{{ f.actor }}</td>
+            <td>{{ f.etiqueta }}</td>
+            <td>{{ f.objeto or '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div style="margin-top:10px;"><a class="admin-link" href="{{ url_for('superadmin.bitacora') }}">Ver toda la bitácora →</a></div>
+    {% else %}
+      <div class="admin-vacio">Todavía no hay actividad registrada.</div>
+    {% endif %}
+  </div>
+{% endblock %}

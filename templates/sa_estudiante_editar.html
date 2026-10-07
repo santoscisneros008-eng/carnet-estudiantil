@@ -1,0 +1,87 @@
+{% extends "sa_base.html" %}
+{% block titulo %}Editar estudiante{% endblock %}
+{% block encabezado %}{{ est.nombres }} {{ est.apellidos }}{% endblock %}
+{% block contenido %}
+  <div class="admin-card">
+    <b>Datos del estudiante</b>
+    <p style="font-size:12.5px; color:var(--pizarra); margin:4px 0 0;">NIE: <b>{{ est.nie }}</b> (el NIE no se puede cambiar: si está mal, hay que registrarlo de nuevo).</p>
+    <form method="post" enctype="multipart/form-data" action="{{ url_for('superadmin.estudiante_editar', nie=est.nie) }}" style="margin-top:12px;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="form-grid">
+        <div class="campo"><label for="nombres">Nombres</label><input type="text" id="nombres" name="nombres" value="{{ est.nombres or '' }}" required></div>
+        <div class="campo"><label for="apellidos">Apellidos</label><input type="text" id="apellidos" name="apellidos" value="{{ est.apellidos or '' }}" required></div>
+        <div class="campo">
+          <label for="grado">Salón / Grado</label>
+          <input type="text" id="grado" name="grado" list="lista-grados" value="{{ est.grado or '' }}">
+          <datalist id="lista-grados">{% for g in grados %}<option value="{{ g }}">{% endfor %}</datalist>
+        </div>
+        <div class="campo"><label for="seccion">Sección</label><input type="text" id="seccion" name="seccion" value="{{ est.seccion or '' }}"></div>
+        <div class="campo"><label for="carrera">Carrera</label><input type="text" id="carrera" name="carrera" value="{{ est.carrera or '' }}"></div>
+        <div class="campo">
+          <label for="estado">Estado</label>
+          <select id="estado" name="estado">{% for s in estados %}<option value="{{ s }}" {{ 'selected' if est.estado == s }}>{{ s }}</option>{% endfor %}</select>
+        </div>
+        <div class="campo"><label for="fecha_nacimiento">Fecha de nacimiento</label><input type="date" id="fecha_nacimiento" name="fecha_nacimiento" value="{{ est.fecha_nacimiento or '' }}"></div>
+        <div class="campo"><label for="telefono">Teléfono</label><input type="text" id="telefono" name="telefono" value="{{ est.telefono or '' }}"></div>
+        <div class="campo full"><label for="correo">Correo</label><input type="text" id="correo" name="correo" value="{{ est.correo or '' }}"></div>
+        <div class="campo full">
+          <label for="foto">Foto</label>
+          {% if est.tiene_foto %}
+            <img src="/foto/{{ est.nie | urlencode }}" alt="Foto actual" style="width:90px; height:90px; object-fit:cover; border-radius:50%; border:2px solid var(--laton); display:block; margin-bottom:8px;">
+          {% endif %}
+          <input type="file" id="foto" name="foto" accept="image/*">
+          {% if est.tiene_foto %}
+            <label style="text-transform:none; letter-spacing:0; font-size:13px; margin-top:8px;"><input type="checkbox" name="quitar_foto" value="1" style="width:auto;"> Quitar la foto actual</label>
+          {% endif %}
+        </div>
+      </div>
+      <div class="form-acciones"><button type="submit" class="btn-primario">Guardar cambios</button></div>
+    </form>
+  </div>
+
+  <div class="admin-card">
+    <b>Contraseña del portal del estudiante</b>
+    <p style="font-size:12.5px; color:var(--pizarra); margin:4px 0 0;">
+      Su usuario es su NIE (<b>{{ est.nie }}</b>). Ahora mismo: <b>{{ 'tiene contraseña' if est.tiene_clave else 'no tiene contraseña' }}</b>.
+    </p>
+    <form method="post" action="{{ url_for('superadmin.estudiante_clave', nie=est.nie) }}" style="margin-top:12px;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="campo">
+        <label for="password">Contraseña nueva (vacía = generar una automática)</label>
+        <input type="text" id="password" name="password" autocomplete="off">
+      </div>
+      <div class="form-acciones"><button type="submit" class="btn-primario">{{ 'Restablecer contraseña' if est.tiene_clave else 'Asignar contraseña' }}</button></div>
+    </form>
+  </div>
+
+  <div class="admin-card">
+    <b>Tarjetas NFC vinculadas</b>
+    {% if tarjetas %}
+      <div style="overflow-x:auto;">
+        <table class="admin-tabla" style="margin-top:8px;">
+          <thead><tr><th>Código (UID)</th><th>Vinculada</th><th></th></tr></thead>
+          <tbody>
+            {% for t in tarjetas %}
+            <tr>
+              <td style="font-family:monospace;">{{ t.uid }}</td>
+              <td>{{ t.asignada_en | sa_fecha_hora }}</td>
+              <td>
+                <form method="post" action="{{ url_for('superadmin.tarjeta_quitar', nie=est.nie, tarjeta_id=t.id) }}"
+                      onsubmit="return confirm('¿Quitar esta tarjeta del estudiante?');">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" class="btn-eliminar">Quitar</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p style="font-size:13px; color:var(--pizarra);">No tiene tarjeta vinculada.</p>
+    {% endif %}
+    <p style="font-size:12.5px; color:var(--pizarra);">Para vincular una tarjeta nueva se usa <code>vincular_tarjeta.py</code> (necesita el lector conectado a la PC).</p>
+  </div>
+
+  <a class="admin-link admin-link--ghost" href="{{ url_for('superadmin.estudiantes') }}">← Volver a los estudiantes</a>
+{% endblock %}

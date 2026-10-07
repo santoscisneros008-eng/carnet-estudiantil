@@ -1,0 +1,54 @@
+{% extends "sa_base.html" %}
+{% block titulo %}Cuentas{% endblock %}
+{% block encabezado %}Cuentas de Dirección y docentes{% endblock %}
+{% block contenido %}
+  <div class="admin-card">
+    <b>Nueva cuenta</b>
+    <form method="post" action="{{ url_for('superadmin.cuenta_nueva') }}" style="margin-top:12px;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="form-grid">
+        <div class="campo">
+          <label for="usuario">Usuario (sin espacios)</label>
+          <input type="text" id="usuario" name="usuario" value="{{ form.usuario or '' }}" required autocomplete="off">
+        </div>
+        <div class="campo">
+          <label for="rol">Tipo de cuenta</label>
+          <select id="rol" name="rol" required>
+            {% for r in roles %}<option value="{{ r }}" {{ 'selected' if form.rol == r }}>{{ rol_nombre[r] }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="campo">
+          <label for="grado">Salón (solo docentes)</label>
+          <input type="text" id="grado" name="grado" list="lista-grados" value="{{ form.grado or '' }}" placeholder="Ej. Primer Año">
+          <datalist id="lista-grados">{% for g in grados %}<option value="{{ g }}">{% endfor %}</datalist>
+        </div>
+        <div class="campo">
+          <label for="password">Contraseña (vacío = generar una)</label>
+          <input type="text" id="password" name="password" autocomplete="off">
+        </div>
+      </div>
+      <div class="form-acciones"><button type="submit" class="btn-primario">Crear cuenta</button></div>
+    </form>
+  </div>
+
+  <div class="admin-card">
+    <b>Cuentas existentes</b>
+    <div style="overflow-x:auto;">
+      <table class="admin-tabla" style="margin-top:8px;">
+        <thead><tr><th>Usuario</th><th>Tipo</th><th>Salón</th><th></th></tr></thead>
+        <tbody>
+          {% for c in cuentas %}
+          <tr>
+            <td>{{ c.usuario }}</td>
+            <td><span class="pill-mini {{ '' if c.rol == 'director' else 'pill-mini--otro' }}">{{ rol_nombre.get(c.rol, c.rol) }}</span></td>
+            <td>{{ c.grado or '—' }}</td>
+            <td style="white-space:nowrap;"><a href="{{ url_for('superadmin.cuenta_editar', cuenta_id=c.id) }}">Editar →</a></td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4" class="admin-vacio">No hay cuentas todavía.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endblock %}

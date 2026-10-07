@@ -9,84 +9,6 @@ REVISAR = no estoy seguro | GENERADO = lo creo un script | IGNORADO = no se lee 
              .qodo/agents/                                      0 KB  git: NO  
              .qodo/workflows/                                   0 KB  git: NO  
 [IGNORADO  ] __pycache__/                                                       contenido no se lee
-[REVISAR   ] actividades-3/                                    17 KB  git: si   carpeta extra del proyecto
-             actividades-3/actividad1/                          4 KB  git: si  
-[REVISAR   ] actividades-3/actividad1/nueva_ruta_pdf_portal.py     4 KB  git: si   dentro de una carpeta extra
-             actividades-3/actividad2/                         11 KB  git: si  
-             actividades-3/actividad2/templates/                3 KB  git: si  
-[REVISAR   ] actividades-3/actividad2/templates/admin_notificaciones.html     3 KB  git: si   dentro de una carpeta extra
-[REVISAR   ] actividades-3/actividad2/gancho_portal_permiso.py     2 KB  git: si   dentro de una carpeta extra
-[REVISAR   ] actividades-3/actividad2/nueva_seccion_notificaciones.py     5 KB  git: si   dentro de una carpeta extra
-[REVISAR   ] actividades-3/actividad2/schema_notificaciones.sql     1 KB  git: si   dentro de una carpeta extra
-             actividades-3/actividad3/                          3 KB  git: si  
-[REVISAR   ] actividades-3/actividad3/css_actividad3_fondo_admin.css     3 KB  git: si   dentro de una carpeta extra
-[REVISAR   ] escudo-institucional/                              0 KB  git: si   carpeta extra del proyecto
-             escudo-institucional/static/                       0 KB  git: si  
-             escudo-institucional/static/css/                   0 KB  git: si  
-[REVISAR   ] escudo-institucional/static/css/style.css          0 KB  git: si   dentro de una carpeta extra
-[REVISAR   ] filtro-mes-asistencia/                            29 KB  git: si   carpeta extra del proyecto
-             filtro-mes-asistencia/templates/                   3 KB  git: si  
-[REVISAR   ] filtro-mes-asistencia/templates/admin_asistencia_estudiante.html     3 KB  git: si   dentro de una carpeta extra
-[REVISAR   ] filtro-mes-asistencia/app.py                      26 KB  git: si   dentro de una carpeta extra
-[REVISAR   ] inasistencia-automatica/                          27 KB  git: si   carpeta extra del proyecto
-             inasistencia-automatica/inasistencia-automatica/    27 KB  git: si  
-             inasistencia-automatica/inasistencia-automatica/templates/     2 KB  git: si  
-[REVISAR   ] inasistencia-automatica/inasistencia-automatica/templates/admin_asistencia_estudiante.html     2 KB  git: si   dentro de una carpeta extra
-[REVISAR   ] inasistencia-automatica/inasistencia-automatica/app.py    25 KB  git: si   dentro de una carpeta extra
-[REVISAR   ] login-admin-fondo/                               430 KB  git: si   carpeta extra del proyecto
-             login-admin-fondo/static/                        426 KB  git: si  
-             login-admin-fondo/static/img/                    426 KB  git: si  
-[REVISAR   ] login-admin-fondo/static/img/fondo_admin_1.jpg   130 KB  git: si   dentro de una carpeta extra
-[REVISAR   ] login-admin-fondo/static/img/fondo_admin_2.jpg   155 KB  git: si   dentro de una carpeta extra
-[REVISAR   ] login-admin-fondo/static/img/fondo_admin_3.jpg   140 KB  git: si   dentro de una carpeta extra
-             login-admin-fondo/templates/                       2 KB  git: si  
-[REVISAR   ] login-admin-fondo/templates/admin_login.html       2 KB  git: si   dentro de una carpeta extra
-[REVISAR   ] login-admin-fondo/_agregar_al_style.css            2 KB  git: si   dentro de una carpeta extra
-[REVISAR   ] mas-transparente/                                  2 KB  git: si   carpeta extra del proyecto
-[REVISAR   ] mas-transparente/_agregar_al_style.css             2 KB  git: si   dentro de una carpeta extra
-[REVISAR   ] mejoras-css-js/                                   19 KB  git: si   carpeta extra del proyecto
-             mejoras-css-js/static/                            17 KB  git: si  
-             mejoras-css-js/static/css/                        13 KB  git: si  
-[REVISAR   ] mejoras-css-js/static/css/style.css               13 KB  git: si   dentro de una carpeta extra
-             mejoras-css-js/static/js/                          4 KB  git: si  
-[REVISAR   ] mejoras-css-js/static/js/main.js                   4 KB  git: si   dentro de una carpeta extra
-             mejoras-css-js/templates/                          1 KB  git: si  
-[REVISAR   ] mejoras-css-js/templates/admin_login.html          1 KB  git: si   dentro de una carpeta extra
-[REVISAR   ] portal-estudiante/                                62 KB  git: si   carpeta extra del proyecto
-             portal-estudiante/static/                         10 KB  git: si  
-             portal-estudiante/static/css/                     10 KB  git: si  
-[REVISAR   ] portal-estudiante/static/css/portal.css           10 KB  git: si   dentro de una carpeta extra
-             portal-estudiante/templates/                      12 KB  git: si  
-[REVISAR   ] portal-estudiante/templates/admin_asistencia_estudiante.html     3 KB  git: si   dentro de una carpeta extra
-[REVISAR   ] portal-estudiante/templates/portal_asistencia.html     3 KB  git: si   dentro de una carpeta extra
-[REVISAR   ] portal-estudiante/templates/portal_base.html       2 KB  git: si   dentro de una carpeta extra
-[REVISAR   ] portal-estudiante/templates/portal_inicio.html     1 KB  git: si   dentro de una carpeta extra
-[REVISAR   ] portal-estudiante/templates/portal_login.html      1 KB  git: si   dentro de una carpeta extra
-[REVISAR   ] portal-estudiante/templates/portal_permiso.html     2 KB  git: si   dentro de una carpeta extra
-[REVISAR   ] portal-estudiante/app.py                          37 KB  git: si   dentro de una carpeta extra
-[REVISAR   ] portal-estudiante/crear_login_estudiante.py        2 KB  git: si   dentro de una carpeta extra
-[REVISAR   ] portal-estudiante/schema_portal_estudiante.sql     1 KB  git: si   dentro de una carpeta extra
-[REVISAR   ] proyecto-limpio/                                  75 KB  git: si   carpeta extra del proyecto
-             proyecto-limpio/static/                           10 KB  git: si  
-             proyecto-limpio/static/css/                       10 KB  git: si  
-[REVISAR   ] proyecto-limpio/static/css/style.css              10 KB  git: si   dentro de una carpeta extra
-             proyecto-limpio/templates/                        18 KB  git: si  
-[REVISAR   ] proyecto-limpio/templates/admin_asistencia.html     3 KB  git: si   dentro de una carpeta extra
-[REVISAR   ] proyecto-limpio/templates/admin_asistencia_estudiante.html     2 KB  git: si   dentro de una carpeta extra
-[REVISAR   ] proyecto-limpio/templates/admin_lista.html         4 KB  git: si   dentro de una carpeta extra
-[REVISAR   ] proyecto-limpio/templates/admin_login.html         1 KB  git: si   dentro de una carpeta extra
-[REVISAR   ] proyecto-limpio/templates/admin_nuevo.html         4 KB  git: si   dentro de una carpeta extra
-[REVISAR   ] proyecto-limpio/templates/carnet.html              3 KB  git: si   dentro de una carpeta extra
-[REVISAR   ] proyecto-limpio/templates/error.html               1 KB  git: si   dentro de una carpeta extra
-[REVISAR   ] proyecto-limpio/templates/inicio.html              1 KB  git: si   dentro de una carpeta extra
-[REVISAR   ] proyecto-limpio/app.py                            25 KB  git: si   dentro de una carpeta extra
-[REVISAR   ] proyecto-limpio/crear_admin.py                     3 KB  git: si   dentro de una carpeta extra
-[REVISAR   ] proyecto-limpio/generate_qr.py                     2 KB  git: si   dentro de una carpeta extra
-[REVISAR   ] proyecto-limpio/kiosko_nfc.py                      9 KB  git: si   dentro de una carpeta extra
-[REVISAR   ] proyecto-limpio/qr_utils.py                        1 KB  git: si   dentro de una carpeta extra
-[REVISAR   ] proyecto-limpio/requirements.txt                   1 KB  git: si   dentro de una carpeta extra
-[REVISAR   ] proyecto-limpio/schema.sql                         4 KB  git: si   dentro de una carpeta extra
-[REVISAR   ] proyecto-limpio/vincular_tarjeta.py                3 KB  git: si   dentro de una carpeta extra
              static/                                          586 KB  git: si  
              static/css/                                       27 KB  git: si  
 [EN USO    ] static/css/portal.css                             10 KB  git: si   una plantilla o el codigo la usa
@@ -121,18 +43,13 @@ REVISAR = no estoy seguro | GENERADO = lo creo un script | IGNORADO = no se lee 
 [EN USO    ] .env                                               1 KB  git: NO   tus contrasenas; vive SOLO en tu PC
 [REVISAR   ] .gitattributes                                     1 KB  git: si   no se que es
 [EN USO    ] .gitignore                                         1 KB  git: si   lista de lo que NO va a GitHub
-[REVISAR   ] _agregar_al_style.css                              2 KB  git: si   no se que es
 [EN USO    ] app.py                                            46 KB  git: si   la aplicacion
 [EN USO    ] crear_admin.py                                     3 KB  git: si   script que se corre desde la terminal
 [EN USO    ] crear_login_estudiante.py                          2 KB  git: si   script que se corre desde la terminal
-[NO USO    ] gancho_portal_permiso.py                           2 KB  git: si   ningun archivo la importa y no es un script
 [EN USO    ] generate_qr.py                                     2 KB  git: si   script que se corre desde la terminal
-[REVISAR   ] jose foto original.jpeg                          101 KB  git: si   no se que es
 [EN USO    ] kiosko_nfc.py                                     10 KB  git: si   script que se corre desde la terminal
-[REVISAR   ] madre 1.jpeg                                     130 KB  git: si   no se que es
-[REVISAR   ] madre 2.jpeg                                     155 KB  git: si   no se que es
-[EN USO    ] mapa_proyecto.py                                   8 KB  git: NO   script que se corre desde la terminal
-[NO USO    ] nueva_seccion_notificaciones.py                    5 KB  git: si   ningun archivo la importa y no es un script
+[EN USO    ] mapa_proyecto.py                                   8 KB  git: si   script que se corre desde la terminal
+[GENERADO  ] mapa_proyecto.txt                                 15 KB  git: si   archivo creado por un script, se puede borrar
 [EN USO    ] qr_utils.py                                        1 KB  git: si   lo importa app.py, generate_qr.py
 [REFERENCIA] README.md                                          5 KB  git: si   documentacion (puede estar desactualizada)
 [EN USO    ] requirements.txt                                   1 KB  git: si   dependencias (Render las instala)
@@ -145,10 +62,9 @@ REVISAR = no estoy seguro | GENERADO = lo creo un script | IGNORADO = no se lee 
 [REFERENCIA] schema_portal_estudiante.sql                       1 KB  git: si   SQL ya aplicado en Aiven (respaldo/documentacion)
 [REFERENCIA] schema_tarjetas_nfc.sql                            1 KB  git: si   SQL ya aplicado en Aiven (respaldo/documentacion)
 [EN USO    ] vincular_tarjeta.py                                3 KB  git: si   script que se corre desde la terminal
-[REVISAR   ] WhatsApp Image 2026-09-16 at 8.59.15 PM.jpeg     140 KB  git: si   no se que es
 
 RESUMEN
-  NO USO    : 2 archivo(s)
-  REVISAR   : 65 archivo(s)
+  GENERADO  : 1 archivo(s)
+  REVISAR   : 4 archivo(s)
   REFERENCIA: 9 archivo(s)
   EN USO    : 32 archivo(s)
