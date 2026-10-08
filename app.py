@@ -100,11 +100,6 @@ def procesar_foto(archivo):
     except Exception:
         return None, None
 
-
-# ---------------------------------------------------------------------------
-# Estudiantes
-# ---------------------------------------------------------------------------
-
 def obtener_estudiante_por_nie(nie: str):
     conn = None
     try:
@@ -253,11 +248,6 @@ def eliminar_estudiante(nie: str) -> bool:
         if conn is not None:
             conn.close()
 
-
-# ---------------------------------------------------------------------------
-# Asistencia
-# ---------------------------------------------------------------------------
-
 def registrar_asistencia(nie: str):
     ahora = datetime.now()
     hoy = ahora.date()
@@ -390,11 +380,6 @@ def obtener_historial_asistencia(nie: str, anio: int, mes: int):
         dia -= timedelta(days=1)
     return historial
 
-
-# ---------------------------------------------------------------------------
-# Permisos de inasistencia (constancias subidas por el estudiante)
-# ---------------------------------------------------------------------------
-
 def guardar_permiso(nie: str, fecha, imagen_bytes: bytes, imagen_tipo: str, comentario: str):
     conn = None
     try:
@@ -470,11 +455,6 @@ def procesar_imagen_permiso(archivo):
     except Exception:
         return None, None
 
-
-# ---------------------------------------------------------------------------
-# Cuentas de administración (director / profesor por salón)
-# ---------------------------------------------------------------------------
-
 def obtener_admin(usuario: str):
     conn = None
     try:
@@ -522,11 +502,6 @@ def requiere_director(vista):
             return redirect(url_for("admin_lista"))
         return vista(*args, **kwargs)
     return envoltura
-
-
-# ---------------------------------------------------------------------------
-# Portal del estudiante (login propio, con su NIE como usuario)
-# ---------------------------------------------------------------------------
 
 def asignar_password_estudiante(nie: str, password: str) -> bool:
     conn = None
@@ -622,11 +597,6 @@ def admin_login():
 def admin_logout():
     session.clear()
     return redirect(url_for("admin_login"))
-
-
-# ---------------------------------------------------------------------------
-# Portal del estudiante
-# ---------------------------------------------------------------------------
 
 @app.route("/portal/login", methods=["GET", "POST"])
 def portal_login():
@@ -856,11 +826,6 @@ def permiso_imagen(nie, fecha_str):
         return "", 404
     return send_file(BytesIO(imagen_bytes), mimetype=imagen_tipo or "image/jpeg")
 
-
-# ---------------------------------------------------------------------------
-# Panel de administración
-# ---------------------------------------------------------------------------
-
 @app.route("/admin")
 @requiere_login
 def admin_lista():
@@ -1087,11 +1052,6 @@ def admin_asistencia_estudiante_pdf(nie):
     nombre_archivo = f"asistencia_{estudiante['nie']}.pdf"
     return send_file(buffer, mimetype="application/pdf", as_attachment=True, download_name=nombre_archivo)
 
-
-# ---------------------------------------------------------------------------
-# Rutas públicas (carné, QR, foto)
-# ---------------------------------------------------------------------------
-
 @app.route("/")
 def inicio():
     return render_template("inicio.html", institucion=NOMBRE_INSTITUCION)
@@ -1141,11 +1101,6 @@ def foto_estudiante(nie):
 @app.errorhandler(404)
 def no_encontrado(e):
     return render_template("error.html", nie=None, institucion=NOMBRE_INSTITUCION), 404
-
-
-# =========================================================
-# Notificaciones de permisos para maestros y Dirección
-# =========================================================
 
 def crear_notificacion_permiso(nie, nombres, apellidos, grado, fecha_inicio, fecha_fin):
     """Avisa al maestro del salón (y a Dirección) que se subió una constancia."""
@@ -1271,13 +1226,6 @@ def admin_notificaciones():
 def admin_notificacion_leida(notif_id):
     marcar_notificacion_leida(notif_id, session["admin_usuario"])
     return redirect(request.referrer or url_for("admin_notificaciones"))
-
-
-    
-
-
-
-
 def notificar_permiso_subido(nie, fecha_inicio, fecha_fin):
     """Busca los datos del estudiante y crea el aviso para su maestro y Dirección."""
     estudiante = obtener_estudiante_por_nie(nie)
@@ -1291,8 +1239,8 @@ def notificar_permiso_subido(nie, fecha_inicio, fecha_fin):
             fecha_fin,
         )
 
-if __name__ == "__main__":
-  from superadmin import crear_blueprint_superadmin
+
+from superadmin import crear_blueprint_superadmin
 app.register_blueprint(crear_blueprint_superadmin(get_conn, NOMBRE_INSTITUCION))
 
 
