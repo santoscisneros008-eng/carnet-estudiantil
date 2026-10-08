@@ -1295,14 +1295,15 @@ if __name__ == "__main__":
   from superadmin import crear_blueprint_superadmin
 app.register_blueprint(crear_blueprint_superadmin(get_conn, NOMBRE_INSTITUCION))
 
-puerto = int(os.getenv("FLASK_PORT", "5000"))
-ip_local = get_local_ip()
-print("=" * 60)
-print(" Carné Digital corriendo")
-print(f" En esta misma PC:   http://127.0.0.1:{puerto}")
-print(f" Desde el celular:   http://{ip_local}:{puerto}")
-print("   (el celular debe estar en la MISMA red Wi-Fi que esta PC)")
-print(f" Panel de administración: http://127.0.0.1:{puerto}/admin")
-print("=" * 60)
-app.run(host="0.0.0.0", port=puerto, debug=True)
 
+if __name__ == "__main__":
+    puerto = int(os.getenv("FLASK_PORT", "5000"))
+    ip_local = get_local_ip()
+    print("=" * 60)
+    print(" Carné Digital corriendo")
+    print(f" En esta misma PC:   http://127.0.0.1:{puerto}")
+    print(f" Desde el celular:   http://{ip_local}:{puerto}")
+    print("   (el celular debe estar en la MISMA red Wi-Fi que esta PC)")
+    print(f" Panel de administración: http://127.0.0.1:{puerto}/admin")
+    print("=" * 60)
+    app.run(host="0.0.0.0", port=puerto, debug=True)
